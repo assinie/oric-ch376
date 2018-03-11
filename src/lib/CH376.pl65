@@ -16,28 +16,16 @@ DEFINE OFFSET_L = OFFSET;
 
 DECLARE TMP;
 
-DECLARE TRACK  ;
-DECLARE HEAD   ;
-DECLARE SECTOR ;
-DECLARE SIZE   ;
-
 DEFINE * = $F3;
 DECLARE PTR    ;
 DECLARE PTR_MAX;
 
-DECLARE CRC WORD;
-DEFINE CRC_L = CRC;
-DEFINE CRC_H = CRC_L+1;
 
 "---------------------------------------------------------------------------";
 "                                                                           ";
 "                   Adresses des Buffers ou Tables                          ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
-DEFINE SCREEN= $BB80;
-
-DEFINE CRCLO = $8000;
-DEFINE CRCHI = $8100;
 
 
 "---------------------------------------------------------------------------";
