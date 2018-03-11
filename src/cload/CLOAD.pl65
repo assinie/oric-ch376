@@ -1,0 +1,289 @@
+'#define WOR word';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 0                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE * = 0;
+DECLARE PTR_READ_DEST WORD;
+DEFINE PTR_READ_DEST_H = PTR_READ_DEST +1;
+
+DECLARE ERRNO;
+
+DECLARE OFFSET_0, OFFSET, OFFSET_H, OFFSET_3;
+DEFINE OFFSET_L = OFFSET;
+
+DECLARE TMP;
+
+DEFINE * = $F3;
+DECLARE PTR    ;
+DECLARE PTR_MAX;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 2                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE * = $27F;
+DECLARE TNAME[17];
+
+DEFINE * = $293;
+DECLARE TH_NAME[17];
+DECLARE TH_DUMMY[4];
+DECLARE TH_UNUSED;
+DECLARE TH_START WORD;
+	DEFINE TH_START_L = TH_START;
+	DEFINE TH_START_H = TH_START +1;
+DECLARE TH_END WORD;
+	DEFINE TH_END_L = TH_END;
+	DEFINE TH_END_H = TH_END +1;
+DECLARE TH_AUTO;
+DECLARE TH_TYPE;
+DECLARE TH_STRING_FLAG;
+DECLARE TH_INTEGER_FLAG;
+DECLARE TH_ERROR;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Routines ROM v1.1                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE GetTapeParams = $E7B2;
+DEFINE Print_Searching = $E57D;
+DEFINE Print_Found = $E594;
+DEFINE Print_Loading = $E59B;
+DEFINE Print_ErrorFound = $E651;
+DEFINE EndTapeLoad = $E8D3;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Buffers ou Tables                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE SCREEN= $BB80;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       En-tête fichier .tap                                ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+'AUTOEXEC = 0';
+'        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
+'        .db >end, <end, >$9600-4, <$9600-4, $0B, "CH376-CLOAD", $00';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                         Variables et buffers                              ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE * = $9600-4;
+DATAW Start, TapeLoad;
+
+DECLARE BUFFER[256];
+"'.dsb 256,0';";
+
+DECLARE FNAME CHARACTER['/TEST.TXT'];
+DATA 0;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                        Début du programme                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+Start:
+	CALL InitCH376;
+	IFF ^.Z THEN Error;
+
+	.A = #<BUFFER;
+	.Y = #>BUFFER;
+	CALL ReadUSBData;
+
+	.A = #<FNAME;
+	.Y = #>FNAME;
+	CALL SetFilename;
+	CALL FileOpen;
+	IFF .A ^= $14 THEN Error;
+
+	.A = $FF;
+	.Y = .A;
+	CALL SetByteRead;
+	IFF ^.Z THEN Error;
+
+	.A = #<SCREEN;
+	.Y = #>SCREEN;
+	"CALL ReadUSBData;";
+	"IFF .Y=0 THEN End;";
+	PTR_READ_DEST <- .AY;
+
+	REPEAT;
+	DO;
+		CALL ReadUSBData2;
+
+		.A = .Y;
+		CLEAR .C;
+		'ADC PTR_READ_DEST';
+		PTR_READ_DEST = .A;
+		IF .C THEN
+			INC PTR_READ_DEST_H;
+
+		CALL ByteRdGo;
+	END;
+	UNTIL ^.Z;
+
+	CALL FileClose;
+"End:";
+Error:
+	ERRNO = .A;
+RETURN;
+
+
+
+"---------------------------------------------------------------------------";
+" OpenTape:                                                                 ";
+"	Ouvre un fichier .tap et charge son entête                          ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"       ERRNO/TH_ERROR: Code erreur                                         ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+OpenTape:
+	" Appel à la ROM v1.1: Vérification syntaxe CLOAD/CSAVE ";
+	" ATTENTION: Faire un HIMEM pour protéger le programme ";
+	CALL GetTapeParams;
+
+	CALL InitCH376;
+	IFF ^.Z THEN TapeError;
+
+	" TODO: Faire un test sur la longueur du fichier ";
+
+	CALL Print_Searching;
+	" Ouverture de l'image tape ";
+	.A = #<TNAME;
+	.Y = #>TNAME;
+	CALL SetFilename;
+	CALL FileOpen;
+	IFF .A ^= $14 THEN TapeError;
+
+	.A = $FF;
+	.Y = .A;
+	CALL SetByteRead;
+	IFF ^.Z THEN TapeError;
+
+	.A = #<BUFFER;
+	.Y = #>BUFFER;
+	CALL ReadUSBData;
+	"IFF .Y = 0 THEN Error;";
+
+	CALL GetByte; IFF .A ^= $16 THEN TapeError;
+
+	REPEAT;
+		CALL GetByte;
+	UNTIL .A ^= $16;
+
+	IFF .A ^= $24 THEN TapeError;
+
+	" Pour les tableaux ";
+	CALL GetByte; TH_INTEGER_FLAG = .A;
+	CALL GetByte; TH_STRING_FLAG = .A;
+
+	" Type de fichier (Basic, LM, Array)";
+	CALL GetByte; TH_TYPE = .A;
+
+	" Autostart? ";
+	CALL GetByte; TH_AUTO = .A;
+
+	" Adresse de fin ";
+	CALL GetByte; TH_END_H = .A; CALL GetByte; TH_END_L = .A;
+
+	" Adresse de début ";
+	CALL GetByte; TH_START_H = .A; CALL GetByte; TH_START_L = .A;
+
+	CALL GetByte; " TH_UNUSED = .A; ";
+
+	.Y = $FF;
+	REPEAT;
+	BEGIN;
+		INC .Y;
+		CALL GetByte; IFF .O THEN TapeError; "Fin de fichier atteinte ";
+		'STA TH_NAME,Y';
+	END;
+	UNTIL .Z;
+
+	ERRNO = .A;
+	TH_ERROR = .A;
+
+	CALL Print_Found;
+
+RETURN;
+
+TapeError:
+	ERRNO = .A;
+	TH_ERROR = .A;
+	CALL Print_ErrorFound;
+	CALL FileClose;
+RETURN;
+
+"---------------------------------------------------------------------------";
+" TapeLoad:                                                                 ";
+"	Simule la commande CLOAD ""                                         ";
+"       Charge le fichier sans tenir compte de l'adresse de fin.            ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"       Retour au BASIC ou exécution si mode AUTO                           ";
+"       Sortie sur erreur                                                   ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+TapeLoad:
+	CALL OpenTape;
+
+	.A = TH_ERROR; IF ^.Z THEN RETURN;
+
+	CALL Print_Loading;
+
+	" Repositionne au début des données pour pouvoir lire ensuite ";
+	" par bloc de 256 octets";
+	.A = PTR;
+	.Y = 0;
+	CALL fseek;
+
+	.A = $FF;
+	.Y = .A;
+	CALL SetByteRead;
+	" IFF ^.Z THEN TapeError; ";
+
+	PTR_READ_DEST <- TH_START;
+
+	REPEAT;
+	DO;
+		CALL ReadUSBData2;
+
+		INC PTR_READ_DEST_H;
+
+		CALL ByteRdGo;
+	END;
+	UNTIL ^.Z;
+
+	CALL FileClose;
+
+	" Appel à la ROM v1.1: Mise à jour éventuelle des liens BASIC ";
+	" Remarque: on n'en revient jamais sauf si mode AUTO -> ";
+	"      a remplacer par: UNSTACK .A; UNSTACK .A; GOTO EndTapeLoad; ? ";
+	" CALL EndTapeLoad; ";
+	GOTO EndTapeLoad;
+
+RETURN;
+
+"---------------------------------------------------------------------------";
+"                          Fin du programme                                 ";
+"---------------------------------------------------------------------------";
+
+EXIT;
+

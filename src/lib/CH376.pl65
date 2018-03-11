@@ -1,0 +1,600 @@
+'#define WOR word';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 0                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE * = 0;
+DECLARE PTR_READ_DEST WORD;
+DEFINE PTR_READ_DEST_H = PTR_READ_DEST +1;
+
+DECLARE ERRNO;
+
+DECLARE OFFSET_0, OFFSET, OFFSET_H, OFFSET_3;
+DEFINE OFFSET_L = OFFSET;
+
+DECLARE TMP;
+
+DECLARE TRACK  ;
+DECLARE HEAD   ;
+DECLARE SECTOR ;
+DECLARE SIZE   ;
+
+DEFINE * = $F3;
+DECLARE PTR    ;
+DECLARE PTR_MAX;
+
+DECLARE CRC WORD;
+DEFINE CRC_L = CRC;
+DEFINE CRC_H = CRC_L+1;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Buffers ou Tables                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE SCREEN= $BB80;
+
+DEFINE CRCLO = $8000;
+DEFINE CRCHI = $8100;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Adresse de l'interface CH376                        ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE CH376_COMMAND = $341;
+DEFINE CH376_DATA    = $340;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Codes d'erreur du CH376                             ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE SUCCESS       = $12;
+DEFINE INT_SUCCESS   = $14;
+DEFINE INT_DISK_READ = $1D;
+DEFINE INT_DISK_WRITE= $1E;
+DEFINE ABORT         = $5F;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                         Variables et buffers                              ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                        Début du programme                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+
+"---------------------------------------------------------------------------";
+" GetByte:                                                                  ";
+"	Lit le prochain caractère du buffer                                 ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"       ACC: Caractère lu                                                   ";
+"       X  : Modifié (0 si appel à ReadUSBData2)                            ";
+"       Y  : Inchangé                                                       ";
+"       V  : 1 Fin du fichier atteinte                                      ";
+"       Z,N: Fonction du caractère lu                                       ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+GetByte:
+	TMP = .Y;
+	.Y = PTR;
+	IFF .Y ^= PTR_MAX THEN GetByte2;
+	CALL ByteRdGo;
+	IFF .A = $14 THEN GetByteErr;
+
+	CALL ReadUSBData2;
+	PTR_MAX = .Y;
+	.Y = 0;
+	PTR = .Y;
+
+GetByte2:
+	.A = @PTR_READ_DEST[.Y];
+	STACK .P; " Sauvegarde P sinon il est modifié par le .Y = TMP ";
+	INC PTR;
+	.Y = TMP;
+	UNSTACK .P;
+RETURN;
+
+GetByteErr:
+	'BIT *-1';
+	.Y = TMP;
+RETURN;
+
+
+"===========================================================================";
+"                                                                           ";
+"           	      	Fonctions bas niveau                                ";
+"                                                                           ";
+"===========================================================================";
+
+"---------------------------------------------------------------------------";
+" InitCH376:                                                                ";
+"	Vérifie la présence du CH376 et monte la clé                        ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+InitCH376:
+	CALL Exists;
+	IF .Z THEN
+	BEGIN;
+		CALL SetUSB;
+		CALL Mount;
+		"IFF ^.Z THEN InitError;";
+	END;
+InitError:
+	ERRNO = .A;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" GetVersion:                                                               ";
+"	Recupere la version du ch376                                        ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: Version + $40                                                  ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+GetVersion:
+	CH376_COMMAND = $01;
+	.A = CH376_DATA;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" ResetAll:                                                                 ";
+"	Reset du ch376                                                      ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: $05                                                            ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+ResetAll:
+	CH376_COMMAND = $05;
+	"Wait 35ms";
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" Exists:                                                                   ";
+"	Teste la presence du CH376                                          ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: $00-> OK, $FF-> NOK                                            ";
+"	Z  : 1 -> OK, 0 -> NOK                                              ";
+"	N  : 0 -> OK, 1 -> NOK                                              ";
+"---------------------------------------------------------------------------";
+Exists:
+	CH376_COMMAND = 6;
+	CH376_DATA = $FF;
+	.A = CH376_DATA;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" GetFileSize:                                                              ";
+"	Récupère la taille du fichier courant                               ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: Modifié (octet de poids fort)                                  ";
+" 	OFFSET[]: Taille du fichier                                         ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+GetFileSize:
+	CH376_COMMAND = $0C;
+	CH376_DATA = $68;
+	OFFSET_0 = CH376_DATA;
+	OFFSET_L = CH376_DATA;
+	OFFSET_H = CH376_DATA;
+	OFFSET_3 = CH376_DATA;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" SetUSB:                                                                   ";
+"	Passe en mode USB                                                   ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: $51 -> OK                                                      ";
+"	Z  : 1 -> OK, 0 -> NOK                                              ";
+"---------------------------------------------------------------------------";
+SetUSB:
+	CH376_COMMAND = $15;
+	CH376_DATA = 6;
+
+	"Wait 10us";
+	'NOP';
+	'NOP';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" SetSD:                                                                    ";
+"	Passe en mode SD                                                    ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: $51 -> OK                                                      ";
+"	Z  : 1 -> OK, 0 -> NOK                                              ";
+"---------------------------------------------------------------------------";
+SetSD:
+	CH376_COMMAND = $15;
+	CH376_DATA = 3;
+
+	"Wait 10us";
+	'NOP';
+	'NOP';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" GetStatus:                                                                ";
+"	Inutile ici                                                         ";
+"                                                                           ";
+" Remplacé par WaitResponse                                                 ";
+"---------------------------------------------------------------------------";
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" WaitResponse:                                                             ";
+"	A voir si il faut préserver X et Y                                  ";
+"                                                                           ";
+" Entree:                                                                   ";
+"	                                                                    ";
+" Sortie:                                                                   ";
+"	Z: 0 -> ACC: Status du CH376                                        ";
+"	Z: 1 -> Timeout                                                     ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+WaitResponse:
+	.Y = $FF;
+	REPEAT;
+		DO;
+			.X=$FF;
+			REPEAT;
+				DO;
+					.A = CH376_COMMAND;
+					IF + THEN
+					BEGIN;
+						CH376_COMMAND = $22;
+						.A = CH376_DATA;
+						RETURN;
+					END;
+					DEC .X;
+				END;
+			UNTIL .Z;
+			DEC .Y;
+		END;
+	UNTIL .Z;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" ReadUSBData:                                                              ";
+"                                                                           ";
+" Entree:                                                                   ";
+"	AY : Adresse du tampon destination                                  ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: Dernier octet lu ou 0 ou $27                                   ";
+"	X  : 0                                                              ";
+"	Y  : Nombre d'octets lus ou 0                                       ";
+"	Z  : 1                                                              ";
+"---------------------------------------------------------------------------";
+
+ReadUSBData:
+	PTR_READ_DEST <- .AY;
+ReadUSBData2:
+	.Y = 0;
+	PTR = .Y; "Pointeur pour GetByte";
+	CH376_COMMAND = $27;
+	.X = CH376_DATA;
+
+	IF ^.Z THEN
+	BEGIN;
+		REPEAT;
+		DO;
+			.A = CH376_DATA;
+			"&PTR_READ_DEST[.Y] = CH376_COMMAND;";
+			'STA (PTR_READ_DEST),Y';
+			.Y+1;
+			.X-1;
+		END;
+		UNTIL .Z;
+		PTR_MAX = .Y; "Pour GetByte";
+	END;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" SetFilename (variante2, avec limite de longueur a 12)                     ";
+"                                                                           ";
+" Entree:                                                                   ";
+"	AY: Adresse du Tampon, fin avec \0                                  ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: 0                                                              ";
+"	Y: Longueur du tampon                                               ";
+"	Z: 1                                                                ";
+"---------------------------------------------------------------------------";
+SetFilename:
+	PTR_READ_DEST <- .AY;
+	CH376_COMMAND = $2F;
+	.Y = $FF;
+	REPEAT;
+		DO;
+			INC .Y;
+			'CPY #13';
+			IF .Z THEN .A=0;
+			IF ^.Z THEN .A = @PTR_READ_DEST[.Y];
+			CH376_DATA = .A;
+		END;
+	UNTIL .Z;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" Mount:                                                                    ";
+"	Monte le volume                                                     ";
+"                                                                           ";
+"  A faire suivre par un appel a ReadUSBData pour lire les infos du volume  ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: $14 -> OK, $1F? -> NOK                                         ";
+"	Z  : 1 -> OK, 0 -> NOK                                              ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+Mount:
+	CH376_COMMAND = $31;
+	CALL WaitResponse;
+	'CMP #INT_SUCCESS';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" FileOpen                                                                  ";
+"	FileOpen('/')    -> ERR_OPEN_DIR ($41)                              ";
+"	FileOpen('DIR')  -> ERR_OPEN_DIR ($41)                              ";
+"	FileOpen('FILE') -> INT_SUCCESS ($14)                               ";
+"	FileOpen('*')    -> INT_DISK_READ ($1d)                             ";
+"	Si le fichier ou le répertoire n'existe pas -> ERR_MISS_FILE ($42)  ";
+"                                                                           ";
+" cmp #$41                                                                  ";
+"	$14 -> N=1, Z=0, C=0                                                ";
+"	$41 -> Z=1, C=1                                                     ";
+"	$42 -> Z=0, C=1                                                     ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+FileOpen:
+	CH376_COMMAND = $32;
+	GOTO WaitResponse;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" FileEnumGo:                                                               ";
+"	Ok -> INT_DISK_READ ($1d)                                           ";
+"	Plus de fichier -> ERR_MISS_FILE ($42) d'après la doc,              ";
+"	ERR_OPEN_DIR ($41) d'après Oricutron                                ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: $1d -> Ok                                                      ";
+"	Z  : 1 -> OK, 0 -> NOK                                              ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+FileEnumGo:
+	CH376_COMMAND = $33;
+	CALL WaitResponse;
+	'CMP #INT_DISK_READ';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" FileCreate                                                                ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC : -> INT_SUCCESS ($14)                                          ";
+"	Z  : 1 -> OK, 0 -> NOK                                              ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+FileCreate:
+	CH376_COMMAND = $34;
+	CALL WaitResponse;
+	'CMP #INT_SUCCESS';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" FileErase                                                                 ";
+"                                                                           ";
+" Entree:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC : -> INT_SUCCESS ($14)                                          ";
+"	Z  : 1 -> OK, 0 -> NOK                                              ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+FileErase:
+	CH376_COMMAND = $35;
+	CALL WaitResponse;
+	'CMP #INT_SUCCESS';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" FileClose                                                                 ";
+"	FileClose(0) -> Pas de mise à jour de la taille du fichier          ";
+"	FileClose(1) -> Mise à jour de la taille du fichier                 ";
+"                                                                           ";
+"	Ok -> INT_SUCCESS ($14)                                             ";
+"                                                                           ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+FileClose:
+	STACK .A;
+	CH376_COMMAND = $36;
+	UNSTACK CH376_DATA;
+	CALL WaitResponse;
+	'CMP #INT_SUCCESS';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" ByteLocate                                                                ";
+"                                                                           ";
+" Entree:                                                                   ";
+"	AY: Offset                                                          ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"       A,X,Y: Modifies                                                     ";
+"	                                                                    ";
+"---------------------------------------------------------------------------";
+ByteLocate:
+	CH376_COMMAND = $39;
+	CH376_DATA = OFFSET_0;
+	CH376_DATA = OFFSET_L;
+	CH376_DATA = OFFSET_H;
+	CH376_DATA = OFFSET_3;
+	CALL WaitResponse;
+	'CMP #INT_SUCCESS';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" fseek:                                                                    ";
+"	Déplacement (absolu) du pointeur du fichier                         ";
+"                                                                           ";
+" Entree:                                                                   ";
+"	AY: Offset                                                          ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"       A,X,Y: Modifies                                                     ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+fseek:
+	STACK .A;
+	CH376_COMMAND = $39;
+	UNSTACK .A;
+	CH376_DATA = .A;
+	CH376_DATA = .Y;
+	CH376_DATA = 0;
+	CH376_DATA = 0;
+	CALL WaitResponse;
+	'CMP #INT_SUCCESS';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" SetByteRead                                                               ";
+"                                                                           ";
+" Entree:                                                                   ";
+"	AY: Nombre d'octets a lire (.A = LSB, .Y = MSB)                     ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: 0                                                              ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+SetByteRead:
+	STACK .A;
+	CH376_COMMAND = $3A;
+	UNSTACK .A;
+	CH376_DATA = .A;
+	CH376_DATA = .Y;
+	CH376_DATA = 0;
+	CH376_DATA = 0;
+	CALL WaitResponse;
+	'CMP #INT_DISK_READ';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" ByteRdGo                                                                  ";
+"	Ok -> INT_DISK_READ ($1d)                                           ";
+"	Plus de données -> INT_SUCCESS ($14)                                ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+ByteRdGo:
+	CH376_COMMAND = $3B;
+	CALL WaitResponse;
+	'CMP #INT_DISK_READ';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" SetByteWrite                                                              ";
+"                                                                           ";
+" Entree:                                                                   ";
+"	AY: Nombre d'octets a écrire (.A = LSB, .Y = MSB)                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: 0                                                              ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+SetByteWrite:
+	STACK .A;
+	CH376_COMMAND = $3C;
+	UNSTACK .A;
+	CH376_DATA = .A;
+	CH376_DATA = .Y;
+	CH376_DATA = 0;
+	CH376_DATA = 0;
+	CALL WaitResponse;
+	'CMP #INT_DISK_READ';
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+" ByteWrGo                                                                  ";
+"	Ok -> INT_DISK_READ ($1d)                                           ";
+"	Plus de données -> INT_SUCCESS ($14)                                ";
+"       X,Y: Modifies                                                       ";
+"---------------------------------------------------------------------------";
+ByteWrGo:
+	CH376_COMMAND = $3D;
+	CALL WaitResponse;
+	'CMP #INT_DISK_READ';
+RETURN;
+
+
