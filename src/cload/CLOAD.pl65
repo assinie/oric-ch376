@@ -72,7 +72,7 @@ DEFINE EndTapeLoad = $E8D3;
 "---------------------------------------------------------------------------";
 'AUTOEXEC = 0';
 '        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
-'        .db >end, <end, >$9600-2, <$9600-2, $0B, "CH376-CLOAD", $00';
+'        .db >end, <end, >($9600-2), <($9600-2), $0B, "CH376-CLOAD", $00';
 
 "---------------------------------------------------------------------------";
 "                                                                           ";
@@ -132,7 +132,9 @@ TapeLoad:
 	DO;
 		CALL ReadUSBData2;
 
-		INC PTR_READ_DEST_H;
+		.A = PTR_READ_DEST_L;
+		IF ^.Z THEN  INC PTR_READ_DEST_H;
+		DEC PTR_READ_DEST_L;
 
 		CALL ByteRdGo;
 	END;
@@ -159,6 +161,12 @@ RETURN;
 "       TH_ERROR: Code erreur                                               ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
+TapeError:
+	TH_ERROR = .A;
+	CALL Print_ErrorFound;
+	CALL FileClose;
+RETURN;
+
 OpenTape:
 	CALL InitCH376;
 	IFF ^.Z THEN TapeError;
@@ -181,53 +189,57 @@ OpenTape:
 	.A = #<BUFFER;
 	.Y = #>BUFFER;
 	CALL ReadUSBData;
-	"IFF .Y = 0 THEN Error;";
 
-	CALL GetByte; IFF .A ^= $16 THEN TapeError;
+	" Si le fichier fait moins de 16 caractères -> Erreur ";
+	IFF .Y < 16 THEN TapeError;
+
+	.Y = 0;
+	.A = BUFFER[.Y]; IFF .A ^= $16 THEN TapeError;
 
 	REPEAT;
-		CALL GetByte;
+	BEGIN;
+		INC .Y;
+		.A = BUFFER[.Y];
+	END;
 	UNTIL .A ^= $16;
 
 	IFF .A ^= $24 THEN TapeError;
 
 	" Pour les tableaux ";
-	CALL GetByte; TH_INTEGER_FLAG = .A;
-	CALL GetByte; TH_STRING_FLAG = .A;
+	INC .Y; TH_INTEGER_FLAG = BUFFER[.Y];
+	INC .Y; TH_STRING_FLAG  = BUFFER[.Y];
 
 	" Type de fichier (Basic, LM, Array)";
-	CALL GetByte; TH_TYPE = .A;
+	INC .Y; TH_TYPE = BUFFER[.Y];
 
 	" Autostart? ";
-	CALL GetByte; TH_AUTO = .A;
+	INC .Y; TH_AUTO = BUFFER[.Y];
 
 	" Adresse de fin ";
-	CALL GetByte; TH_END_H = .A; CALL GetByte; TH_END_L = .A;
+	INC .Y; TH_END_H = BUFFER[.Y]; INC .Y; TH_END_L = BUFFER[.Y];
 
 	" Adresse de début ";
-	CALL GetByte; TH_START_H = .A; CALL GetByte; TH_START_L = .A;
+	INC .Y; TH_START_H = BUFFER[.Y]; INC .Y; TH_START_L = BUFFER[.Y];
 
-	CALL GetByte; " TH_UNUSED = .A; ";
+	INC .Y; " TH_UNUSED = .A; ";
 
-	.Y = $FF;
+	.X = $FF;
 	REPEAT;
 	BEGIN;
 		INC .Y;
-		CALL GetByte; IFF .O THEN TapeError; "Fin de fichier atteinte ";
-		'STA TH_NAME,Y';
+		INC .X;
+		.A = BUFFER[.Y];
+		'STA TH_NAME,X';
 	END;
 	UNTIL .Z;
 
 	TH_ERROR = .A;
 
+	INC .Y;
+	PTR = .Y;
+
 	CALL Print_Found;
 
-RETURN;
-
-TapeError:
-	TH_ERROR = .A;
-	CALL Print_ErrorFound;
-	CALL FileClose;
 RETURN;
 
 
