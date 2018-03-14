@@ -1,0 +1,197 @@
+'#define WOR word';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 0                                 ";
+"                                                                           ";
+" 00-0B                                                                     ";
+" F3-F8                                                                     ";
+"---------------------------------------------------------------------------";
+DEFINE * = 0;
+DECLARE PTR_READ_DEST WORD;
+DEFINE PTR_READ_DEST_H = PTR_READ_DEST +1;
+
+DECLARE ERRNO;
+
+DECLARE OFFSET_0, OFFSET, OFFSET_H, OFFSET_3;
+DEFINE OFFSET_L = OFFSET;
+
+DECLARE TMP;
+
+DEFINE * = $91;
+DECLARE StrPtr WORD;
+
+DEFINE * = $F3;
+DECLARE PTR    ;
+DECLARE PTR_MAX;
+DECLARE R0,R1,R2,R3;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 2                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Routines ROM v1.0                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE Print       = $CB61;
+DEFINE EvalExpr    = $CEBB;
+DEFINE SyntaxError = $CFE4;
+DEFINE CheckStr    = $D712;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Routines ROM v1.1                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE Print       = $CBAB;
+DEFINE EvalExpr    = $CF17;
+DEFINE SyntaxError = $D070;
+DEFINE CheckStr    = $D7CD;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Buffers ou Tables                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE SCREEN = $BB80;
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       En-tête fichier .tap                                ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+'AUTOEXEC = 0';
+'        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
+'        .db >end, <end, >($9600-2), <($9600-2), $0B, "CH376-HELP", $00';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                         Variables et buffers                              ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE * = $9600-2;
+DATAW Help;
+
+DECLARE BUFFER[256];
+"'.dsb 256,0';";
+
+DECLARE FNAME CHARACTER['/'];
+DECLARE NAME CHARACTER['12345678.123'];
+DATA 0;
+
+DECLARE Extension CHARACTER['.SCR'];
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                        Début du programme                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+Help:
+	CALL GetParam;
+	IF .Z THEN GOTO SyntaxError;
+
+	CALL InitCH376;
+	IFF ^.Z THEN Error;
+
+	.A = #<BUFFER;
+	.Y = #>BUFFER;
+	CALL ReadUSBData;
+
+	.A = #<FNAME;
+	.Y = #>FNAME;
+	CALL SetFilename;
+	CALL FileOpen;
+	IFF .A ^= $14 THEN Error; " PRINT 'FILE NOT FOUND':STOP ";
+
+	.A = $FF;
+	.Y = .A;
+	CALL SetByteRead;
+	IFF ^.Z THEN Error;
+
+	" .A = #<SCREEN; ";
+	" .Y = #>SCREEN; ";
+	"CALL ReadUSBData;";
+	"IFF .Y=0 THEN End;";
+	PTR_READ_DEST = ##SCREEN;
+
+	REPEAT;
+	DO;
+		CALL ReadUSBData2;
+
+		.A = PTR_READ_DEST_L;
+		IF ^.Z THEN  INC PTR_READ_DEST_H;
+		DEC PTR_READ_DEST_L;
+
+		CALL ByteRdGo;
+	END;
+	UNTIL ^.Z;
+
+	CALL FileClose;
+"End:";
+Error:
+	ERRNO = .A;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+" GetParam:                                                                 ";
+"	Récupère le nom de la commande                                      ";
+"                                                                           ";
+" Entrée:                                                                   ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"       A: 0 -> Pas de commande, $FF -> OK                                  ";
+"       X,Y: Potentiellement modifiés                                       ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+GetParam:
+	" Initialisation du Buffer ";
+	NAME.13 = 0;
+
+	" Evalue le paramètre ";
+	CALL EvalExpr;
+
+	" Récupère le paramètre, erreur si pas  une chaine ";
+	" XY     : Adresse de la chaine ";
+	" $91-92 : Adresse de la chaine ";
+	" A      : Longueur de la chaine ";
+	" P      : Suivant le contenu de A ";
+	CALL CheckStr;
+
+	IF ^.Z THEN
+	BEGIN;
+		IF .A >=9 THEN .A = 8;
+
+		.X = .A;
+		.Y =  0;
+		REPEAT;
+		BEGIN;
+			.A = @StrPtr[.Y];
+			'STA NAME,Y';
+			.Y+1;
+			.X-1;
+		END;
+		UNTIL .Z;
+
+		R1 = .Y;
+		NAME[R1].4 = Extension;
+
+		.A = $FF;
+	END;
+RETURN;
+
+
+"---------------------------------------------------------------------------";
+"                          Fin du programme                                 ";
+"---------------------------------------------------------------------------";
+'#include "CH376.s"';
+
+EXIT;
+
