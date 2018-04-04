@@ -115,16 +115,13 @@ Help:
 	CALL SetByteRead;
 	IFF ^.Z THEN Error;
 
-	" .A = #<SCREEN; ";
-	" .Y = #>SCREEN; ";
-	"CALL ReadUSBData;";
-	"IFF .Y=0 THEN End;";
 	PTR_READ_DEST = ##SCREEN;
 
 	REPEAT;
 	DO;
 		CALL ReadUSBData2;
 
+		" Calcule PTR_READ_DEST += $FF ";
 		.A = PTR_READ_DEST_L;
 		IF ^.Z THEN  INC PTR_READ_DEST_H;
 		DEC PTR_READ_DEST_L;
@@ -134,7 +131,7 @@ Help:
 	UNTIL ^.Z;
 
 	CALL FileClose;
-"End:";
+
 Error:
 	ERRNO = .A;
 RETURN;
