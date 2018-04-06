@@ -100,12 +100,10 @@ Help:
 	CALL InitCH376;
 	IFF ^.Z THEN Error;
 
-	.A = #<BUFFER;
-	.Y = #>BUFFER;
+	.AY =## BUFFER;
 	CALL ReadUSBData;
 
-	.A = #<FNAME;
-	.Y = #>FNAME;
+	.AY =## FNAME;
 	CALL SetFilename;
 	CALL FileOpen;
 	IFF .A ^= $14 THEN Error; " PRINT 'FILE NOT FOUND':STOP ";

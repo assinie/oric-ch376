@@ -175,8 +175,7 @@ OpenTape:
 
 	CALL Print_Searching;
 	" Ouverture de l'image tape ";
-	.A = #<TNAME;
-	.Y = #>TNAME;
+	.AY =## TNAME;
 	CALL SetFilename;
 	CALL FileOpen;
 	IFF .A ^= $14 THEN TapeError;
@@ -186,8 +185,7 @@ OpenTape:
 	CALL SetByteRead;
 	IFF ^.Z THEN TapeError;
 
-	.A = #<BUFFER;
-	.Y = #>BUFFER;
+	.AY =## BUFFER;
 	CALL ReadUSBData;
 
 	" Si le fichier fait moins de 16 caractères -> Erreur ";
