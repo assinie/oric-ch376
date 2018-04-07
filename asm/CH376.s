@@ -238,10 +238,10 @@ READUSBDATA
 		; .X = CH376DATA;
 	LDX CH376DATA
 		; IF ^.Z THEN
-	BEQ ZZZ005
+	BEQ ZZZ002
 		; BEGIN;
 		; REPEAT;
-	ZZZ006
+	ZZZ003
 		; DO;
 		; .A = CH376DATA;
 	LDA CH376DATA
@@ -254,12 +254,58 @@ READUSBDATA
 	DEX
 		; END;
 		; UNTIL .Z;
-	BNE ZZZ006
+	BNE ZZZ003
 		; PTRMAX = .Y; "Pour GetByte";
 	STY PTRMAX
 		; END;
 		;RETURN;
+	ZZZ002
+	RTS
+#endif
+
+; -----------------------------------------------------------------------------
+;
+; -----------------------------------------------------------------------------
+#iflused WRITEREQDATA
+#echo Ajout de WriteReqData
+		;WRITEUSBDATA:
+WRITEREQDATA
+		; PTRWRITESRC <- .AY;
+	STA PTRWRITESRC
+	STY PTRWRITESRC+1
+		;WRITEUSBDATA2:
+	WRITEREQDATA2
+		; .Y = 0;
+	LDY #0
+		; CH376COMMAND = $2D;
+	LDA #$2D
+	STA CH376COMMAND
+		; CH376DATA = .X;
+	LDX CH376DATA
+		; PTW = .Y; "Pointeur pour PutByte";
+	STX PTWMAX
+		; IF ^.Z THEN
+	BEQ ZZZ004
+		; BEGIN;
+		; REPEAT;
 	ZZZ005
+		; DO;
+		; .A = @PTRWRITESRC[.Y];
+	LDA (PTRWRITESRC),Y
+		; CH376DATA = .A;
+	STA CH376DATA
+		; .Y+1;
+	INY
+		; .X-1;
+	DEX
+		; END;
+		; UNTIL .Z;
+	BNE ZZZ005
+		; PTWMAX = .Y; "Pour PutByte";
+	STY PTW
+		; END;
+		;RETURN;
+	ZZZ004
 	RTS
 #endif
 
@@ -279,25 +325,25 @@ SETFILENAME
 		; .Y = $FF;
 	LDY #$FF
 		; REPEAT;
-	ZZZ007
+	ZZZ006
 		; DO;
 		; INC .Y;
 	INY
 		; 'CPY #13';
 	CPY #13
 		; IF .Z THEN .A=0;
-	BNE ZZZ008
+	BNE ZZZ007
 	LDA #0
 		; IF ^.Z THEN .A = @PTRREADDEST[.Y];
-	ZZZ008
-	BEQ ZZZ009
+	ZZZ007
+	BEQ ZZZ008
 	LDA (PTRREADDEST),Y
 		; CH376DATA = .A;
-	ZZZ009
+	ZZZ008
 	STA CH376DATA
 		; END;
 		; UNTIL .Z;
-	BNE ZZZ007
+	BNE ZZZ006
 		;RETURN;
 	RTS
 #endif
@@ -563,8 +609,8 @@ BYTEWRGO
 	STA CH376COMMAND
 		; CALL WAITRESPONSE;
 	JSR WAITRESPONSE
-		; 'CMP #INTDISKREAD';
-	CMP #INTDISKREAD
+		; 'CMP #INTDISKWRITE';
+	CMP #INTDISKWRITE
 		;RETURN;
 	RTS
 #endif
@@ -580,17 +626,17 @@ WAITRESPONSE
 		; .Y = $FF;
 	LDY #$FF
 		; REPEAT;
-	ZZZ002
+	ZZZ009
 		; DO;
 		; .X=$FF;
 	LDX #$FF
 		; REPEAT;
-	ZZZ003
+	ZZZ010
 		; DO;
 		; .A = CH376COMMAND;
 	LDA CH376COMMAND
 		; IF + THEN
-	BMI ZZZ004
+	BMI ZZZ011
 		; BEGIN;
 		; CH376COMMAND = $22;
 	LDA #$22
@@ -601,16 +647,16 @@ WAITRESPONSE
 	RTS
 		; END;
 		; DEC .X;
-	ZZZ004
+	ZZZ011
 	DEX
 		; END;
 		; UNTIL .Z;
-	BNE ZZZ003
+	BNE ZZZ010
 		; DEC .Y;
 	DEY
 		; END;
 		; UNTIL .Z;
-	BNE ZZZ002
+	BNE ZZZ009
 		;RETURN;
 	RTS
 #endif

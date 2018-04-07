@@ -9,6 +9,9 @@ DEFINE * = 0;
 DECLARE PTR_READ_DEST WORD;
 DEFINE PTR_READ_DEST_H = PTR_READ_DEST +1;
 
+DECLARE PTR_WRITE_SRC WORD;
+DEFINE PTR_WRITE_SRC_H = PTR_WRITE_SRC +1;
+
 DECLARE ERRNO;
 
 DECLARE OFFSET_0, OFFSET, OFFSET_H, OFFSET_3;
@@ -20,6 +23,8 @@ DEFINE * = $F3;
 DECLARE PTR    ;
 DECLARE PTR_MAX;
 
+DECLARE PTW    ;
+DECLARE PTW_MAX;
 
 "---------------------------------------------------------------------------";
 "                                                                           ";
@@ -314,6 +319,47 @@ ReadUSBData2:
 		END;
 		UNTIL .Z;
 		PTR_MAX = .Y; "Pour GetByte";
+	END;
+RETURN;
+
+'#endif';
+
+
+"---------------------------------------------------------------------------";
+" WriteReqData:                                                             ";
+"                                                                           ";
+" Entree:                                                                   ";
+"	AY : Adresse du tampon source                                       ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: Dernier octet écrit ou 0 ou $27                                ";
+"	X  : 0                                                              ";
+"	Y  : Nombre d'octets écrits ou 0                                    ";
+"	Z  : 1                                                              ";
+"---------------------------------------------------------------------------";
+'#iflused WriteUSBData';
+
+WriteReqData:
+	PTR_WRITE_SRC <- .AY;
+WriteReqData2:
+	.Y = 0;
+
+	CH376_COMMAND = $2D;
+	.X = CH376_DATA;
+
+	PTW_MAX = .X; "Pointeur pour PutByte";
+
+	IF ^.Z THEN
+	BEGIN;
+		REPEAT;
+		DO;
+			.A = @PTR_WRITE_SRC[.Y];
+			CH376_DATA = .A;
+			.Y+1;
+			.X-1;
+		END;
+		UNTIL .Z;
+		PTW = .Y; "Pour PutByte";
 	END;
 RETURN;
 
@@ -633,7 +679,7 @@ RETURN;
 ByteWrGo:
 	CH376_COMMAND = $3D;
 	CALL WaitResponse;
-	'CMP #INT_DISK_READ';
+	'CMP #INT_DISK_WRITE';
 RETURN;
 
 '#endif';
