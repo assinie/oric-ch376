@@ -62,12 +62,6 @@ DECLARE TH_ERROR;
 "                                                                           ";
 "---------------------------------------------------------------------------";
 DEFINE GetTapeParams = $E7B2;
-DEFINE Print_Searching = $E57D;
-DEFINE Print_Found = $E594;
-DEFINE Print_Loading = $E59B;
-DEFINE Print_ErrorFound = $E651;
-DEFINE EndTapeLoad = $E8D3;
-
 DEFINE Print_Saving = $E585;
 
 "---------------------------------------------------------------------------";

@@ -1,7 +1,20 @@
+; -----------------------------------------------------------------------------
+;
+;                       Adresse de l'interface CH376
+;
+; -----------------------------------------------------------------------------
+
 		;DEFINE CH376COMMAND = $341;
 CH376COMMAND=$341
 		;DEFINE CH376DATA = $340;
 CH376DATA=$340
+
+
+; -----------------------------------------------------------------------------
+;
+;                       Codes d'erreur du CH376
+;
+; -----------------------------------------------------------------------------
 		;DEFINE SUCCESS = $12;
 SUCCESS=$12
 		;DEFINE INTSUCCESS = $14;
@@ -14,7 +27,17 @@ INTDISKWRITE=$1E
 ABORT=$5F
 
 ; -----------------------------------------------------------------------------
+; GetByte:
+;	Lit le prochain caractère du buffer
 ;
+; Entree:
+;
+; Sortie:
+;       ACC: Caractère lu
+;       X  : Modifié (0 si appel à ReadUSBData2)
+;       Y  : Inchangé
+;       V  : 1 Fin du fichier atteinte
+;       Z,N: Fonction du caractère lu
 ; -----------------------------------------------------------------------------
 #iflused GETBYTE
 #echo Ajout de GetByte
@@ -65,6 +88,12 @@ GETBYTE
 #endif
 
 ; -----------------------------------------------------------------------------
+; InitCH376:
+;	Vérifie la présence du CH376 et monte la clé
+;
+; Entree:
+;
+; Sortie:
 ;
 ; -----------------------------------------------------------------------------
 #iflused INITCH376
@@ -93,6 +122,13 @@ INITCH376
 #endif
 
 ; -----------------------------------------------------------------------------
+; GetVersion:
+;	Recupere la version du ch376
+;
+; Entree:
+;
+; Sortie:
+;	ACC: Version + $40
 ;
 ; -----------------------------------------------------------------------------
 #iflused GETVERSION
@@ -109,6 +145,13 @@ GETVERSION
 #endif
 
 ; -----------------------------------------------------------------------------
+; ResetAll:
+;	Reset du ch376
+;
+; Entree:
+;
+; Sortie:
+;	ACC: $05
 ;
 ; -----------------------------------------------------------------------------
 #iflused RESETALL
@@ -124,7 +167,15 @@ RESETALL
 #endif
 
 ; -----------------------------------------------------------------------------
+; Exists:
+;	Teste la presence du CH376
 ;
+; Entree:
+;
+; Sortie:
+;	ACC: $00-> OK, $FF-> NOK
+;	Z  : 1 -> OK, 0 -> NOK
+;	N  : 0 -> OK, 1 -> NOK
 ; -----------------------------------------------------------------------------
 #iflused EXISTS
 #echo Ajout de Exists
@@ -143,6 +194,14 @@ EXISTS
 #endif
 
 ; -----------------------------------------------------------------------------
+; GetFileSize:
+;	Récupère la taille du fichier courant
+;
+; Entree:
+;
+; Sortie:
+;	ACC: Modifié (octet de poids fort)
+; 	OFFSET[]: Taille du fichier
 ;
 ; -----------------------------------------------------------------------------
 #iflused GETFILESIZE
@@ -172,7 +231,14 @@ GETFILESIZE
 #endif
 
 ; -----------------------------------------------------------------------------
+; SetUSB:
+;	Passe en mode USB
 ;
+; Entree:
+;
+; Sortie:
+;	ACC: $51 -> OK
+;	Z  : 1 -> OK, 0 -> NOK
 ; -----------------------------------------------------------------------------
 #iflused SETUSB
 #echo Ajout de SetUSB
@@ -194,7 +260,14 @@ SETUSB
 #endif
 
 ; -----------------------------------------------------------------------------
+; SetSD:
+;	Passe en mode SD
 ;
+; Entree:
+;
+; Sortie:
+;	ACC: $51 -> OK
+;	Z  : 1 -> OK, 0 -> NOK
 ; -----------------------------------------------------------------------------
 #iflused SETSD
 #echo Ajout de SetSD
@@ -217,7 +290,16 @@ SETSD
 
 
 ; -----------------------------------------------------------------------------
+; ReadUSBData:
 ;
+; Entree:
+;	AY : Adresse du tampon destination
+;
+; Sortie:
+;	ACC: Dernier octet lu ou 0 ou $27
+;	X  : 0
+;	Y  : Nombre d'octets lus ou 0
+;	Z  : 1
 ; -----------------------------------------------------------------------------
 #iflused READUSBDATA
 #echo Ajout de ReadUSBData
@@ -264,11 +346,20 @@ READUSBDATA
 #endif
 
 ; -----------------------------------------------------------------------------
+; WriteReqData:
 ;
+; Entree:
+;	AY : Adresse du tampon source
+;
+; Sortie:
+;	ACC: Dernier octet écrit ou 0 ou $27
+;	X  : 0
+;	Y  : Nombre d'octets écrits ou 0
+;	Z  : 1
 ; -----------------------------------------------------------------------------
 #iflused WRITEREQDATA
 #echo Ajout de WriteReqData
-		;WRITEUSBDATA:
+		;WRITEREQDATA:
 WRITEREQDATA
 		; PTRWRITESRC <- .AY;
 	STA PTRWRITESRC
@@ -310,7 +401,15 @@ WRITEREQDATA
 #endif
 
 ; -----------------------------------------------------------------------------
+; SetFilename (variante2, avec limite de longueur a 12)
 ;
+; Entree:
+;	AY: Adresse du Tampon, fin avec \0
+;
+; Sortie:
+;	ACC: 0
+;	Y: Longueur du tampon
+;	Z: 1
 ; -----------------------------------------------------------------------------
 #iflused SETFILENAME
 #echo Ajout de SetFilename
@@ -349,7 +448,17 @@ SETFILENAME
 #endif
 
 ; -----------------------------------------------------------------------------
+; Mount:
+;	Monte le volume
 ;
+;  A faire suivre par un appel a ReadUSBData pour lire les infos du volume
+;
+; Entree:
+;
+; Sortie:
+;	ACC: $14 -> OK, $1F? -> NOK
+;	Z  : 1 -> OK, 0 -> NOK
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused MOUNT
 #echo Ajout de Mount
@@ -364,8 +473,26 @@ MOUNT
 	CMP #INTSUCCESS
 		;RETURN;
 	RTS
+#endif
+
+; -----------------------------------------------------------------------------
+; FileOpen
+;	FileOpen('/')    -> ERR_OPEN_DIR ($41)
+;	FileOpen('DIR')  -> ERR_OPEN_DIR ($41)
+;	FileOpen('FILE') -> INT_SUCCESS ($14)
+;	FileOpen('*')    -> INT_DISK_READ ($1d)
+;	Si le fichier ou le répertoire n'existe pas -> ERR_MISS_FILE ($42)
+;
+; cmp #$41
+;	$14 -> N=1, Z=0, C=0
+;	$41 -> Z=1, C=1
+;	$42 -> Z=0, C=1
+;       X,Y: Modifies
+; -----------------------------------------------------------------------------
+#iflused FILEOPEN
+#echo Ajout de FileOpen
 		;FILEOPEN:
-	FILEOPEN
+FILEOPEN
 		; CH376COMMAND = $32;
 	LDA #$32
 	STA CH376COMMAND
@@ -376,7 +503,17 @@ MOUNT
 #endif
 
 ; -----------------------------------------------------------------------------
+; FileEnumGo:
+;	Ok -> INT_DISK_READ ($1d)
+;	Plus de fichier -> ERR_MISS_FILE ($42) d'après la doc,
+;	ERR_OPEN_DIR ($41) d'après Oricutron
 ;
+; Entree:
+;
+; Sortie:
+;	ACC: $1d -> Ok
+;	Z  : 1 -> OK, 0 -> NOK
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused FILEENUMGO
 #echo Ajout de FileEnumGo
@@ -394,7 +531,14 @@ FILEENUMGO
 #endif
 
 ; -----------------------------------------------------------------------------
+; FileCreate
 ;
+; Entree:
+;
+; Sortie:
+;	ACC : -> INT_SUCCESS ($14)
+;	Z  : 1 -> OK, 0 -> NOK
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused FILECREATE
 #echo Ajout de FileCreate
@@ -412,7 +556,14 @@ FILECREATE
 #endif
 
 ; -----------------------------------------------------------------------------
+; FileErase
 ;
+; Entree:
+;
+; Sortie:
+;	ACC : -> INT_SUCCESS ($14)
+;	Z  : 1 -> OK, 0 -> NOK
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused FILEERASE
 #echo FileErase
@@ -430,7 +581,13 @@ FILEERASE
 #endif
 
 ; -----------------------------------------------------------------------------
+; FileClose
+;	FileClose(0) -> Pas de mise à jour de la taille du fichier
+;	FileClose(1) -> Mise à jour de la taille du fichier
 ;
+;	Ok -> INT_SUCCESS ($14)
+;
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused FILECLOSE
 #echo Ajout de FileClose
@@ -453,6 +610,13 @@ FILECLOSE
 #endif
 
 ; -----------------------------------------------------------------------------
+; ByteLocate
+;
+; Entree:
+;	AY: Offset
+;
+; Sortie:
+;       A,X,Y: Modifies
 ;
 ; -----------------------------------------------------------------------------
 #iflused BYTELOCATE
@@ -483,6 +647,14 @@ BYTELOCATE
 #endif
 
 ; -----------------------------------------------------------------------------
+; fseek:
+;	Déplacement (absolu) du pointeur du fichier
+;
+; Entree:
+;	AY: Offset
+;
+; Sortie:
+;       A,X,Y: Modifies
 ;
 ; -----------------------------------------------------------------------------
 #iflused FSEEK
@@ -515,7 +687,14 @@ FSEEK
 #endif
 
 ; -----------------------------------------------------------------------------
+; SetByteRead
 ;
+; Entree:
+;	AY: Nombre d'octets a lire (.A = LSB, .Y = MSB)
+;
+; Sortie:
+;	ACC: 0
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused SETBYTEREAD
 #echo Ajout de SetByteRead
@@ -547,7 +726,10 @@ SETBYTEREAD
 #endif
 
 ; -----------------------------------------------------------------------------
-;
+; ByteRdGo
+;	Ok -> INT_DISK_READ ($1d)
+;	Plus de données -> INT_SUCCESS ($14)
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused BYTERDGO
 #echo Ajout de ByteRdGo
@@ -565,7 +747,14 @@ BYTERDGO
 #endif
 
 ; -----------------------------------------------------------------------------
+; SetByteWrite
 ;
+; Entree:
+;	AY: Nombre d'octets a écrire (.A = LSB, .Y = MSB)
+;
+; Sortie:
+;	ACC: 0
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused SETBYTEWRITE
 #echo Ajout de SetByteWrite
@@ -598,7 +787,10 @@ SETBYTEWRITE
 
 
 ; -----------------------------------------------------------------------------
-;
+; ByteWrGo
+;	Ok -> INT_DISK_READ ($1d)
+;	Plus de données -> INT_SUCCESS ($14)
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused BYTEWRGO
 #echo Ajout de ByteWrGo
@@ -617,7 +809,15 @@ BYTEWRGO
 
 
 ; -----------------------------------------------------------------------------
+; WaitResponse:
+;	A voir si il faut préserver X et Y
 ;
+; Entree:
+;
+; Sortie:
+;	Z: 0 -> ACC: Status du CH376
+;	Z: 1 -> Timeout
+;       X,Y: Modifies
 ; -----------------------------------------------------------------------------
 #iflused WAITRESPONSE
 #echo Ajout de WaitResponse

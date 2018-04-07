@@ -7,10 +7,12 @@
 "---------------------------------------------------------------------------";
 DEFINE * = 0;
 DECLARE PTR_READ_DEST WORD;
-DEFINE PTR_READ_DEST_H = PTR_READ_DEST +1;
+	DEFINE PTR_READ_DEST_L = PTR_READ_DEST;
+	DEFINE PTR_READ_DEST_H = PTR_READ_DEST +1;
 
 DECLARE PTR_WRITE_SRC WORD;
-DEFINE PTR_WRITE_SRC_H = PTR_WRITE_SRC +1;
+	DEFINE PTR_WRITE_SRC_L = PTR_WRITE_SRC;
+	DEFINE PTR_WRITE_SRC_H = PTR_WRITE_SRC +1;
 
 DECLARE ERRNO;
 
@@ -367,7 +369,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " SetFilename (variante2, avec limite de longueur a 12)                     ";
 "                                                                           ";
 " Entree:                                                                   ";
@@ -423,7 +424,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " FileOpen                                                                  ";
 "	FileOpen('/')    -> ERR_OPEN_DIR ($41)                              ";
 "	FileOpen('DIR')  -> ERR_OPEN_DIR ($41)                              ";
@@ -448,7 +448,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " FileEnumGo:                                                               ";
 "	Ok -> INT_DISK_READ ($1d)                                           ";
 "	Plus de fichier -> ERR_MISS_FILE ($42) d'après la doc,              ";
@@ -473,7 +472,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " FileCreate                                                                ";
 "                                                                           ";
 " Entree:                                                                   ";
@@ -495,7 +493,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " FileErase                                                                 ";
 "                                                                           ";
 " Entree:                                                                   ";
@@ -517,7 +514,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " FileClose                                                                 ";
 "	FileClose(0) -> Pas de mise à jour de la taille du fichier          ";
 "	FileClose(1) -> Mise à jour de la taille du fichier                 ";
@@ -540,7 +536,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " ByteLocate                                                                ";
 "                                                                           ";
 " Entree:                                                                   ";
@@ -594,7 +589,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " SetByteRead                                                               ";
 "                                                                           ";
 " Entree:                                                                   ";
@@ -622,7 +616,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " ByteRdGo                                                                  ";
 "	Ok -> INT_DISK_READ ($1d)                                           ";
 "	Plus de données -> INT_SUCCESS ($14)                                ";
@@ -640,7 +633,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " SetByteWrite                                                              ";
 "                                                                           ";
 " Entree:                                                                   ";
@@ -668,7 +660,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " ByteWrGo                                                                  ";
 "	Ok -> INT_DISK_READ ($1d)                                           ";
 "	Plus de données -> INT_SUCCESS ($14)                                ";
@@ -686,7 +677,6 @@ RETURN;
 
 
 "---------------------------------------------------------------------------";
-"                                                                           ";
 " WaitResponse:                                                             ";
 "	A voir si il faut préserver X et Y                                  ";
 "                                                                           ";
