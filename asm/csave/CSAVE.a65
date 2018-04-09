@@ -1,0 +1,331 @@
+										;'#define WOR word'; 
+#define WOR word
+										;'#include <include/CH376.h>'; 
+#include <include/CH376.h>
+
+;---------------------------------------------------------------------------
+; 
+; Variables en page 0 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $9A; 
+	*=$9A
+										;DECLARE TXTTAB WORD; 
+TXTTAB  *=*+2
+										;DECLARE VARTAB WORD; 
+VARTAB  *=*+2
+
+;---------------------------------------------------------------------------
+; 
+; Variables en page 2 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $27F; 
+	*=$27F
+										;DECLARE TNAME[17]; 
+TNAME  *=*+17
+										;DEFINE * = $293; 
+	*=$293
+										;DECLARE TH_NAME[17]; 
+TH_NAME  *=*+17
+										;DECLARE TH_DUMMY[4]; 
+TH_DUMMY  *=*+4
+										;DECLARE TH_UNUSED; 
+TH_UNUSED  *=*+1
+										;DECLARE TH_START WORD; 
+TH_START  *=*+2
+										; DEFINE TH_START_L = TH_START; 
+TH_START_L=TH_START 
+										; DEFINE TH_START_H = TH_START +1; 
+TH_START_H=TH_START+1
+										;DECLARE TH_END WORD; 
+TH_END  *=*+2
+										; DEFINE TH_END_L = TH_END; 
+TH_END_L=TH_END 
+										; DEFINE TH_END_H = TH_END +1; 
+TH_END_H=TH_END+1
+										;DECLARE TH_AUTO; 
+TH_AUTO  *=*+1
+										;DECLARE TH_TYPE; 
+TH_TYPE  *=*+1
+										;DECLARE TH_STRING_FLAG; 
+TH_STRING_FLAG  *=*+1
+										;DECLARE TH_INTEGER_FLAG; 
+TH_INTEGER_FLAG  *=*+1
+										;DECLARE TH_ERROR; 
+TH_ERROR  *=*+1
+
+;---------------------------------------------------------------------------
+; 
+; Adresses des Routines ROM v1.1 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE GetTapeParams = $E7B2; 
+GetTapeParams=$E7B2
+										;DEFINE Print_Saving = $E585; 
+Print_Saving=$E585
+										;DEFINE Print_ErrorFound = $E651; 
+Print_ErrorFound=$E651
+
+;---------------------------------------------------------------------------
+; 
+; Adresses des Buffers ou Tables 
+; 
+;---------------------------------------------------------------------------
+
+;---------------------------------------------------------------------------
+; 
+; En-tete fichier .tap 
+; 
+;---------------------------------------------------------------------------
+										;'AUTOEXEC = 0'; 
+AUTOEXEC= 0
+										;' .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC'; 
+ .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
+										;' .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-CSAVE", $00'; 
+ .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-CSAVE", $00
+
+;---------------------------------------------------------------------------
+; 
+; Variables et buffers 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $9600-2; 
+	*=$9600-2
+										;DATAW TapeWrite; 
+.WOR TapeWrite 
+										;DECLARE BUFFER[256]; 
+BUFFER  .dsb 256,0
+;'.dsb 256,0';
+
+;---------------------------------------------------------------------------
+; 
+; Debut du programme 
+; 
+;---------------------------------------------------------------------------
+
+;---------------------------------------------------------------------------
+; TapeLoad: 
+; Simule la commande CSAVE "" 
+; Charge le fichier sans tenir compte de l'adresse de fin. 
+; 
+; Entree: 
+; 
+; Sortie: 
+; Retour au BASIC ou execution si mode AUTO 
+; Sortie sur erreur 
+; 
+;---------------------------------------------------------------------------
+										;TapeWrite: 
+TapeWrite 
+	; Initialisation par defaut (debut et fin du programme BASIC) 
+										; TH_START <- TXTTAB; 
+	LDA TXTTAB 
+	STA TH_START 
+	LDA TXTTAB+1
+	STA TH_START+1
+										; TH_END <- VARTAB; 
+	LDA VARTAB 
+	STA TH_END 
+	LDA VARTAB+1
+	STA TH_END+1
+	; Appel a la ROM v1.1: Verification syntaxe CLOAD/CSAVE 
+	; ATTENTION: Faire un HIMEM pour proteger le programme 
+										; CALL GetTapeParams; 
+	JSR GetTapeParams 
+										; CALL OpenTape; 
+	JSR OpenTape 
+										; .A = TH_ERROR; IF ^.Z THEN RETURN; 
+	LDA TH_ERROR 
+	BEQ ZZ0001 
+	RTS 
+										; OFFSET <- TH_END; 
+ZZ0001
+	LDA TH_END 
+	STA OFFSET 
+	LDA TH_END+1
+	STA OFFSET+1
+	; Soustraction 16 bits (10+8+7=25 octets): OFFSET = TH_END - TH_START 
+										; OFFSET_L = OFFSET_L - TH_START_L; 
+	LDA OFFSET_L 
+	SEC
+	SBC TH_START_L 
+	STA OFFSET_L 
+										; .A = OFFSET_H; 'SBC TH_START_H'; OFFSET_H = .A; 
+	LDA OFFSET_H 
+	SBC TH_START_H
+	STA OFFSET_H 
+	; Ou: OFFSET.2 = TH_END -TH_START 
+	; Ajoute 1 pour avoir la taille totale
+										; INCW OFFSET; 
+	INC OFFSET 
+	BNE ZZ0002 
+	INC OFFSET+1
+ZZ0002
+										; .AY <- OFFSET; 
+	LDA OFFSET 
+	LDY OFFSET+1
+										; CALL SetByteWrite; 
+	JSR SetByteWrite 
+	; IFF ^.Z THEN TapeError; 
+										; PTR_WRITE_SRC <- TH_START; 
+	LDA TH_START 
+	STA PTR_WRITE_SRC 
+	LDA TH_START+1
+	STA PTR_WRITE_SRC+1
+										; REPEAT; 
+ZZ0003
+										; DO; 
+										; CALL WriteReqData2; 
+	JSR WriteReqData2 
+	; Calcule PTR_WRITE_SRC += $FF 
+										; .A = PTR_WRITE_SRC_L; 
+	LDA PTR_WRITE_SRC_L 
+										; IF ^.Z THEN INC PTR_WRITE_SRC_H; 
+	BEQ ZZ0004 
+	INC PTR_WRITE_SRC_H 
+										; DEC PTR_WRITE_SRC_L; 
+ZZ0004
+	DEC PTR_WRITE_SRC_L 
+										; CALL ByteWrGo; 
+	JSR ByteWrGo 
+										; END; 
+										; UNTIL ^.Z; 
+	BEQ ZZ0003 
+										; .A = 1; CALL FileClose; 
+	LDA #1
+	JSR FileClose 
+										;RETURN; 
+	RTS 
+
+;---------------------------------------------------------------------------
+; OpenTape: 
+; Ouvre un fichier .tap et ecrit son entete 
+; 
+; Entree: 
+; 
+; Sortie: 
+; TH_ERROR: Code erreur 
+; 
+;---------------------------------------------------------------------------
+										;TapeError: 
+TapeError 
+										; TH_ERROR = .A; 
+	STA TH_ERROR 
+										; CALL Print_ErrorFound; 
+	JSR Print_ErrorFound 
+										; .A = 1; CALL FileClose; 
+	LDA #1
+	JSR FileClose 
+										;RETURN; 
+	RTS 
+										;OpenTape: 
+OpenTape 
+										; TH_ERROR = 0; 
+	LDA #0
+	STA TH_ERROR 
+										; CALL InitCH376; 
+	JSR InitCH376 
+										; IFF ^.Z THEN TapeError; 
+	BNE TapeError 
+	; TODO: Faire un test sur la longueur du fichier 
+										; CALL Print_Saving; 
+	JSR Print_Saving 
+	; Ouverture de l'image tape 
+										; .AY = ##TNAME; 
+	LDA #<TNAME 
+	LDY #>TNAME 
+										; CALL SetFilename; 
+	JSR SetFilename 
+										; CALL FileCreate; 
+	JSR FileCreate 
+										; IFF .A ^= $14 THEN TapeError; 
+	CMP #$14
+	BNE TapeError 
+	; Entete: 4x$16, $24, [$02B0...$02A8], [$027F...], 0, [$02A9]...|$02AB] 
+	; Amorce 
+										; .A = $24; 
+	LDA #$24
+										; .Y = $04; 
+	LDY #$04
+										; 'STA BUFFER,Y'; 
+	STA BUFFER,Y
+										; .A = $16; 
+	LDA #$16
+										; DEC .Y; 
+	DEY
+										; REPEAT; 
+ZZ0005
+										; DO; 
+										; 'STA BUFFER,Y'; 
+	STA BUFFER,Y
+										; DEC .Y; 
+	DEY
+										; END; 
+										; UNTIL -; 
+	BPL ZZ0005 
+	; Entete 
+										; .X = $08; 
+	LDX #$08
+										; .Y = $05; 
+	LDY #$05
+										; REPEAT; 
+ZZ0006
+										; DO; 
+										; .A = TH_UNUSED[.X]; 
+	LDA TH_UNUSED,X
+										; 'STA BUFFER,Y'; 
+	STA BUFFER,Y
+										; INC .Y; 
+	INY
+										; DEC .X; 
+	DEX
+										; END; 
+										; UNTIL -; 
+	BPL ZZ0006 
+	; Sortie avec .X = $FF 
+	; Nom du programme 
+										; DEC .Y; " Annule par le premier INC .Y de la boucle "; 
+	DEY
+										; REPEAT; 
+ZZ0007
+										; DO; 
+										; INC .X; 
+	INX
+										; INC .Y; 
+	INY
+										; .A = TNAME[.X]; 
+	LDA TNAME,X
+										; 'STA BUFFER,Y'; 
+	STA BUFFER,Y
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0007 
+										; INC .Y; 
+	INY
+	; Longueur totale de l'entete: .AY 
+										; .A = .Y; 
+	TYA
+										; .Y = $00; 
+	LDY #$00
+										; CALL SetByteWrite; 
+	JSR SetByteWrite 
+										; .AY = ##BUFFER; 
+	LDA #<BUFFER 
+	LDY #>BUFFER 
+										; CALL WriteReqData; 
+	JSR WriteReqData 
+	; Faire un flush, sinon on repart au debut du fichier pour les 
+	; prochaines ecritures 
+										; CALL ByteWrGo; 
+	JSR ByteWrGo 
+										;RETURN; 
+	RTS 
+
+;---------------------------------------------------------------------------
+; Fin du programme 
+;---------------------------------------------------------------------------
+										;'#include "lib/CH376.s"'; 
+#include "lib/CH376.s"
+										;EXIT; 
+END

@@ -1,0 +1,260 @@
+										;'#define WOR word';
+#define WOR word
+										;'#include <include/CH376.h>';
+#include <include/CH376.h>
+
+;---------------------------------------------------------------------------
+;
+; Variables en page 0
+;
+;---------------------------------------------------------------------------
+										;DEFINE * = $0A;
+	*=$0A
+										;DECLARE R0 WORD;
+R0  *=*+2
+										;DECLARE R1 ;
+R1  *=*+1
+										;DEFINE * = $91;
+	*=$91
+										;DECLARE StrPtr WORD;
+StrPtr  *=*+2
+
+;---------------------------------------------------------------------------
+;
+; Variables en page 2
+;
+;---------------------------------------------------------------------------
+
+;---------------------------------------------------------------------------
+;
+; Adresses des Routines ROM v1.0
+;
+;---------------------------------------------------------------------------
+										;DEFINE Print = $CB61;
+;Print=$CB61
+										;DEFINE EvalExpr = $CEBB;
+;EvalExpr=$CEBB
+										;DEFINE SyntaxError = $CFE4;
+;SyntaxError=$CFE4
+										;DEFINE CheckStr = $D712;
+;CheckStr=$D712
+
+;---------------------------------------------------------------------------
+;
+; Adresses des Routines ROM v1.1
+;
+;---------------------------------------------------------------------------
+										;DEFINE Print = $CBAB;
+Print=$CBAB
+										;DEFINE EvalExpr = $CF17;
+EvalExpr=$CF17
+										;DEFINE SyntaxError = $D070;
+SyntaxError=$D070
+										;DEFINE CheckStr = $D7CD;
+CheckStr=$D7CD
+
+;---------------------------------------------------------------------------
+;
+; Adresses des Buffers ou Tables
+;
+;---------------------------------------------------------------------------
+										;DEFINE SCREEN = $BB80;
+SCREEN=$BB80
+
+;---------------------------------------------------------------------------
+;
+; En-tete fichier .tap
+;
+;---------------------------------------------------------------------------
+										;'AUTOEXEC = 0';
+AUTOEXEC= 0
+										;' .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
+.db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
+										;' .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-HELP", $00';
+.db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-HELP", $00
+;---------------------------------------------------------------------------
+;
+; Variables et buffers
+;
+;---------------------------------------------------------------------------
+										;DEFINE * = $9600-2;
+	*=$9600-2
+										;DATAW Help;
+.WOR Help
+										;DECLARE BUFFER[256];
+BUFFER  .dsb 256,0
+;'.dsb 256,0';
+										;DECLARE FNAME CHARACTER['/'];
+FNAME .BYT '/'
+										;DECLARE NAME CHARACTER['12345678.123'];
+NAME .BYT '12345678.123'
+										;DATA 0;
+.BYT 0
+										;DECLARE Extension CHARACTER['.SCR'];
+Extension .BYT '.SCR'
+
+;---------------------------------------------------------------------------
+;
+; Debut du programme
+;
+;---------------------------------------------------------------------------
+										;Help:
+Help
+										; CALL GetParam;
+	JSR GetParam
+										; IF .Z THEN GOTO SyntaxError;
+	BNE ZZ0001
+	JMP SyntaxError
+										; CALL InitCH376;
+ZZ0001
+	JSR InitCH376
+										; IFF ^.Z THEN Error;
+	BNE Error
+										; .AY =## BUFFER;
+	LDA #<BUFFER
+	LDY #>BUFFER
+										; CALL ReadUSBData;
+	JSR ReadUSBData
+										; .AY =## FNAME;
+	LDA #<FNAME
+	LDY #>FNAME
+										; CALL SetFilename;
+	JSR SetFilename
+										; CALL FileOpen;
+	JSR FileOpen
+										; IFF .A ^= $14 THEN Error; " PRINT 'FILE NOT FOUND':STOP ";
+	CMP #$14
+	BNE Error
+										; .A = $FF;
+	LDA #$FF
+										; .Y = .A;
+	TAY
+										; CALL SetByteRead;
+	JSR SetByteRead
+										; IFF ^.Z THEN Error;
+	BNE Error
+										; PTR_READ_DEST = ##SCREEN;
+	LDA #<SCREEN
+	STA PTR_READ_DEST
+	LDA #>SCREEN
+	STA PTR_READ_DEST+1
+										; REPEAT;
+ZZ0002
+										; DO;
+										; CALL ReadUSBData2;
+	JSR ReadUSBData2
+
+	; Calcule PTR_READ_DEST += $FF
+										; .A = PTR_READ_DEST_L;
+	LDA PTR_READ_DEST_L
+										; IF ^.Z THEN INC PTR_READ_DEST_H;
+	BEQ ZZ0003
+	INC PTR_READ_DEST_H
+										; DEC PTR_READ_DEST_L;
+ZZ0003
+	DEC PTR_READ_DEST_L
+										; CALL ByteRdGo;
+	JSR ByteRdGo
+										; END;
+										; UNTIL ^.Z;
+	BEQ ZZ0002
+										; CALL FileClose;
+	JSR FileClose
+										;Error:
+Error
+										; ERRNO = .A;
+	STA ERRNO
+										;RETURN;
+	RTS
+
+;---------------------------------------------------------------------------
+; GetParam:
+; Recupere le nom de la commande
+;
+; Entree:
+;
+; Sortie:
+; A: 0 -> Pas de commande, $FF -> OK
+; X,Y: Potentiellement modifies
+;
+;---------------------------------------------------------------------------
+										;GetParam:
+GetParam
+	; Initialisation du Buffer
+										; NAME.13 = 0;
+	LDY #0
+	LDA #13
+	STA R0
+	LDA #0
+ZZ0004 STA NAME,Y
+	INY
+	DEC R0
+	BNE ZZ0004
+
+	; Evalue le parametre
+										; CALL EvalExpr;
+	JSR EvalExpr
+
+	; Recupere le parametre, erreur si pas une chaine
+	; XY : Adresse de la chaine
+	; $91-92 : Adresse de la chaine
+	; A : Longueur de la chaine
+	; P : Suivant le contenu de A
+										; CALL CheckStr;
+	JSR CheckStr
+										; IF ^.Z THEN
+	BEQ ZZ0005
+										; BEGIN;
+										; IF .A >=9 THEN .A = 8;
+	CMP #9
+	BCS  *+5
+	JMP ZZ0006
+	LDA #8
+										; .X = .A;
+ZZ0006
+	TAX
+										; .Y = 0;
+	LDY #0
+										; REPEAT;
+ZZ0007
+										; BEGIN;
+										; .A = @StrPtr[.Y];
+	LDA (StrPtr),Y
+										; 'STA NAME,Y';
+	STA NAME,Y
+										; .Y+1;
+	INY
+										; .X-1;
+	DEX
+										; END;
+										; UNTIL .Z;
+	BNE ZZ0007
+										; R1 = .Y;
+	STY R1
+										; NAME[R1].4 = Extension;
+	LDA R1
+	TAY
+	LDA #4
+	STA R0
+	LDX #0
+ZZ0008 LDA Extension,X
+;
+	STA NAME,Y
+	INX
+	INY
+	DEC R0
+	BNE ZZ0008
+										; .A = $FF;
+	LDA #$FF
+										; END;
+										;RETURN;
+ZZ0005
+	RTS
+
+;---------------------------------------------------------------------------
+; Fin du programme
+;---------------------------------------------------------------------------
+										;'#include "lib/CH376.s"';
+#include "lib/CH376.s"
+										;EXIT;
+END

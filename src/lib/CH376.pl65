@@ -1,32 +1,13 @@
 '#define WOR word';
 
+'#include <include/CH376.h>';
+
 "---------------------------------------------------------------------------";
 "                                                                           ";
 "                       Variables en page 0                                 ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
-DEFINE * = 0;
-DECLARE PTR_READ_DEST WORD;
-	DEFINE PTR_READ_DEST_L = PTR_READ_DEST;
-	DEFINE PTR_READ_DEST_H = PTR_READ_DEST +1;
 
-DECLARE PTR_WRITE_SRC WORD;
-	DEFINE PTR_WRITE_SRC_L = PTR_WRITE_SRC;
-	DEFINE PTR_WRITE_SRC_H = PTR_WRITE_SRC +1;
-
-DECLARE ERRNO;
-
-DECLARE OFFSET_0, OFFSET, OFFSET_H, OFFSET_3;
-DEFINE OFFSET_L = OFFSET;
-
-DECLARE TMP;
-
-DEFINE * = $F3;
-DECLARE PTR    ;
-DECLARE PTR_MAX;
-
-DECLARE PTW    ;
-DECLARE PTW_MAX;
 
 "---------------------------------------------------------------------------";
 "                                                                           ";
@@ -49,11 +30,6 @@ DEFINE CH376_DATA    = $340;
 "                       Codes d'erreur du CH376                             ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
-DEFINE SUCCESS       = $12;
-DEFINE INT_SUCCESS   = $14;
-DEFINE INT_DISK_READ = $1D;
-DEFINE INT_DISK_WRITE= $1E;
-DEFINE ABORT         = $5F;
 
 
 "---------------------------------------------------------------------------";
@@ -83,6 +59,7 @@ DEFINE ABORT         = $5F;
 "                                                                           ";
 "---------------------------------------------------------------------------";
 '#iflused GetByte';
+'#echo Ajout GetByte';
 
 GetByte:
 	TMP = .Y;
@@ -128,6 +105,7 @@ RETURN;
 "                                                                           ";
 "---------------------------------------------------------------------------";
 '#iflused InitCH376';
+'#echo Ajout InitCH376';
 
 InitCH376:
 	CALL Exists;
@@ -155,6 +133,7 @@ RETURN;
 "                                                                           ";
 "---------------------------------------------------------------------------";
 '#iflused GetVersion';
+'#echo Ajout GetVersion';
 
 GetVersion:
 	CH376_COMMAND = $01;
@@ -175,6 +154,7 @@ RETURN;
 "                                                                           ";
 "---------------------------------------------------------------------------";
 '#iflused ResetAll';
+'#echo Ajout ResetAll';
 
 ResetAll:
 	CH376_COMMAND = $05;
@@ -196,6 +176,7 @@ RETURN;
 "	N  : 0 -> OK, 1 -> NOK                                              ";
 "---------------------------------------------------------------------------";
 '#iflused Exists';
+'#echo Ajout Exists';
 
 Exists:
 	CH376_COMMAND = 6;
@@ -218,6 +199,7 @@ RETURN;
 "                                                                           ";
 "---------------------------------------------------------------------------";
 '#iflused GetFileSize';
+'#echo Ajout GetFileSize';
 
 GetFileSize:
 	CH376_COMMAND = $0C;
@@ -242,6 +224,7 @@ RETURN;
 "	Z  : 1 -> OK, 0 -> NOK                                              ";
 "---------------------------------------------------------------------------";
 '#iflused SetUSB';
+'#echo Ajout SetUSB';
 
 SetUSB:
 	CH376_COMMAND = $15;
@@ -266,6 +249,7 @@ RETURN;
 "	Z  : 1 -> OK, 0 -> NOK                                              ";
 "---------------------------------------------------------------------------";
 '#iflused SetSD';
+'#echo Ajout SetSD';
 
 SetSD:
 	CH376_COMMAND = $15;
@@ -300,6 +284,7 @@ RETURN;
 "	Z  : 1                                                              ";
 "---------------------------------------------------------------------------";
 '#iflused ReadUSBData';
+'#echo Ajout ReadUSBData';
 
 ReadUSBData:
 	PTR_READ_DEST <- .AY;
@@ -339,7 +324,8 @@ RETURN;
 "	Y  : Nombre d'octets écrits ou 0                                    ";
 "	Z  : 1                                                              ";
 "---------------------------------------------------------------------------";
-'#iflused WriteUSBData';
+'#iflused WriteReqData';
+'#echo Ajout WriteReqData';
 
 WriteReqData:
 	PTR_WRITE_SRC <- .AY;
@@ -380,6 +366,7 @@ RETURN;
 "	Z: 1                                                                ";
 "---------------------------------------------------------------------------";
 '#iflused SetFilename';
+'#echo Ajout SetFilename';
 
 SetFilename:
 	PTR_READ_DEST <- .AY;
@@ -396,7 +383,7 @@ SetFilename:
 	UNTIL .Z;
 RETURN;
 
-'#endf';
+'#endif';
 
 
 "---------------------------------------------------------------------------";
@@ -413,6 +400,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused Mount';
+'#echo Ajout Mount';
 
 Mount:
 	CH376_COMMAND = $31;
@@ -438,6 +426,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused FileOpen';
+'#echo Ajout FileOpen';
 
 FileOpen:
 	CH376_COMMAND = $32;
@@ -461,6 +450,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused FileEnumGo';
+'#echo Ajout FileEnumGo';
 
 FileEnumGo:
 	CH376_COMMAND = $33;
@@ -482,6 +472,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused FileCreate';
+'#echo Ajout FileCreate';
 
 FileCreate:
 	CH376_COMMAND = $34;
@@ -503,6 +494,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused FileErase';
+'#echo Ajout FileErase';
 
 FileErase:
 	CH376_COMMAND = $35;
@@ -523,6 +515,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused FileClose';
+'#echo Ajout FileClose';
 
 FileClose:
 	STACK .A;
@@ -546,6 +539,7 @@ RETURN;
 "	                                                                    ";
 "---------------------------------------------------------------------------";
 '#iflused ByteLocate';
+'#echo Ajout ButeLocate';
 
 ByteLocate:
 	CH376_COMMAND = $39;
@@ -572,6 +566,7 @@ RETURN;
 "                                                                           ";
 "---------------------------------------------------------------------------";
 '#iflused fseek';
+'#echo Ajout fseek';
 
 fseek:
 	STACK .A;
@@ -599,6 +594,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused SetByteRead';
+'#echo Ajout SetByteRead';
 
 SetByteRead:
 	STACK .A;
@@ -622,6 +618,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused ByteRdGo';
+'#echo Ajout ByteRdGo';
 
 ByteRdGo:
 	CH376_COMMAND = $3B;
@@ -643,6 +640,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused SetByteWrite';
+'#echo Ajout SetByteWrite';
 
 SetByteWrite:
 	STACK .A;
@@ -666,6 +664,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused ByteWrGo';
+'#echo Ajout ByteWrGo';
 
 ByteWrGo:
 	CH376_COMMAND = $3D;
@@ -688,6 +687,7 @@ RETURN;
 "       X,Y: Modifies                                                       ";
 "---------------------------------------------------------------------------";
 '#iflused WaitResponse';
+'#echo Ajout WaitResponse';
 
 WaitResponse:
 	.Y = $FF;

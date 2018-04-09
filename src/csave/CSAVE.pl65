@@ -1,36 +1,15 @@
 '#define WOR word';
 
+'#include <include/CH376.h>';
+
 "---------------------------------------------------------------------------";
 "                                                                           ";
 "                       Variables en page 0                                 ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
-DEFINE * = 0;
-DECLARE PTR_READ_DEST WORD;
-	DEFINE PTR_READ_DEST_L = PTR_READ_DEST;
-	DEFINE PTR_READ_DEST_H = PTR_READ_DEST +1;
-
-DECLARE PTR_WRITE_SRC WORD;
-	DEFINE PTR_WRITE_SRC_L = PTR_WRITE_SRC;
-	DEFINE PTR_WRITE_SRC_H = PTR_WRITE_SRC +1;
-
-DECLARE ERRNO;
-
-DECLARE OFFSET_0, OFFSET, OFFSET_H, OFFSET_3;
-DEFINE OFFSET_L = OFFSET;
-
-DECLARE TMP;
-
 DEFINE * = $9A;
 DECLARE TXTTAB WORD;
 DECLARE VARTAB WORD;
-
-DEFINE * = $F3;
-DECLARE PTR    ;
-DECLARE PTR_MAX;
-
-DECLARE PTW    ;
-DECLARE PTW_MAX;
 
 "---------------------------------------------------------------------------";
 "                                                                           ";
@@ -63,6 +42,7 @@ DECLARE TH_ERROR;
 "---------------------------------------------------------------------------";
 DEFINE GetTapeParams = $E7B2;
 DEFINE Print_Saving = $E585;
+DEFINE Print_ErrorFound = $E651;
 
 "---------------------------------------------------------------------------";
 "                                                                           ";
@@ -78,7 +58,7 @@ DEFINE Print_Saving = $E585;
 "---------------------------------------------------------------------------";
 'AUTOEXEC = 0';
 '        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
-'        .db >end, <end, >($9600-2), <($9600-2), $0B, "CH376-CSAVE", $00';
+'        .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-CSAVE", $00';
 
 "---------------------------------------------------------------------------";
 "                                                                           ";
@@ -161,7 +141,7 @@ RETURN;
 
 "---------------------------------------------------------------------------";
 " OpenTape:                                                                 ";
-"	Ouvre un fichier .tap et charge son entête                          ";
+"	Ouvre un fichier .tap et écrit son entête                           ";
 "                                                                           ";
 " Entree:                                                                   ";
 "                                                                           ";
@@ -250,7 +230,7 @@ RETURN;
 "---------------------------------------------------------------------------";
 "                          Fin du programme                                 ";
 "---------------------------------------------------------------------------";
-'#include "CH376.s"';
+'#include "lib/CH376.s"';
 
 EXIT;
 

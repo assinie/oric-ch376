@@ -1,0 +1,341 @@
+										;'#define WOR word'; 
+#define WOR word
+;---------------------------------------------------------------------------
+; 
+; Variables en page 0 
+; 
+;---------------------------------------------------------------------------
+										;'#include <include/CH376.h>'; 
+#include <include/CH376.h>
+
+;---------------------------------------------------------------------------
+; 
+; Variables en page 2 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $27F; 
+	*=$27F
+										;DECLARE TNAME[17]; 
+TNAME  *=*+17
+										;DEFINE * = $293; 
+	*=$293
+										;DECLARE TH_NAME[17]; 
+TH_NAME  *=*+17
+										;DECLARE TH_DUMMY[4]; 
+TH_DUMMY  *=*+4
+										;DECLARE TH_UNUSED; 
+TH_UNUSED  *=*+1
+										;DECLARE TH_START WORD; 
+TH_START  *=*+2
+										; DEFINE TH_START_L = TH_START; 
+TH_START_L=TH_START 
+										; DEFINE TH_START_H = TH_START +1; 
+TH_START_H=TH_START+1
+										;DECLARE TH_END WORD; 
+TH_END  *=*+2
+										; DEFINE TH_END_L = TH_END; 
+TH_END_L=TH_END 
+										; DEFINE TH_END_H = TH_END +1; 
+TH_END_H=TH_END+1
+										;DECLARE TH_AUTO; 
+TH_AUTO  *=*+1
+										;DECLARE TH_TYPE; 
+TH_TYPE  *=*+1
+										;DECLARE TH_STRING_FLAG; 
+TH_STRING_FLAG  *=*+1
+										;DECLARE TH_INTEGER_FLAG; 
+TH_INTEGER_FLAG  *=*+1
+										;DECLARE TH_ERROR; 
+TH_ERROR  *=*+1
+
+;---------------------------------------------------------------------------
+; 
+; Adresses des Routines ROM v1.1 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE GetTapeParams = $E7B2; 
+GetTapeParams=$E7B2
+										;DEFINE Print_Searching = $E57D; 
+Print_Searching=$E57D
+										;DEFINE Print_Found = $E594; 
+Print_Found=$E594
+										;DEFINE Print_Loading = $E59B; 
+Print_Loading=$E59B
+										;DEFINE Print_ErrorFound = $E651; 
+Print_ErrorFound=$E651
+										;DEFINE EndTapeLoad = $E8D3; 
+EndTapeLoad=$E8D3
+
+;---------------------------------------------------------------------------
+; 
+; Adresses des Buffers ou Tables 
+; 
+;---------------------------------------------------------------------------
+
+;---------------------------------------------------------------------------
+; 
+; En-tete fichier .tap 
+; 
+;---------------------------------------------------------------------------
+										;'AUTOEXEC = 0'; 
+AUTOEXEC= 0
+										;' .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC'; 
+.db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
+										;' .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-CLOAD", $00'; 
+.db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-CLOAD", $00
+
+;---------------------------------------------------------------------------
+; 
+; Variables et buffers 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $9600-2; 
+	*=$9600-2
+										;DATAW TapeLoad; 
+.WOR TapeLoad 
+										;DECLARE BUFFER[256]; 
+BUFFER  .dsb 256,0
+;'.dsb 256,0';
+
+;---------------------------------------------------------------------------
+; 
+; Debut du programme 
+; 
+;---------------------------------------------------------------------------
+
+;---------------------------------------------------------------------------
+; TapeLoad: 
+; Simule la commande CLOAD "" 
+; Charge le fichier sans tenir compte de l'adresse de fin. 
+; 
+; Entree: 
+; 
+; Sortie: 
+; Retour au BASIC ou execution si mode AUTO 
+; Sortie sur erreur 
+; 
+;---------------------------------------------------------------------------
+										;TapeLoad: 
+TapeLoad 
+	; Appel a la ROM v1.1: Verification syntaxe CLOAD/CSAVE 
+	; ATTENTION: Faire un HIMEM pour proteger le programme 
+										; CALL GetTapeParams; 
+	JSR GetTapeParams 
+										; CALL OpenTape; 
+	JSR OpenTape 
+										; .A = TH_ERROR; IF ^.Z THEN RETURN; 
+	LDA TH_ERROR 
+	BEQ ZZ0001 
+	RTS 
+										; CALL Print_Loading; 
+ZZ0001
+	JSR Print_Loading 
+
+	; Repositionne au debut des donnees pour pouvoir lire ensuite 
+	; par bloc de 256 octets
+										; .A = PTR; 
+	LDA PTR 
+										; .Y = 0; 
+	LDY #0
+										; CALL fseek; 
+	JSR fseek 
+										; .A = $FF; 
+	LDA #$FF
+										; .Y = .A; 
+	TAY
+										; CALL SetByteRead; 
+	JSR SetByteRead 
+
+	; IFF ^.Z THEN TapeError; 
+										; PTR_READ_DEST <- TH_START; 
+	LDA TH_START 
+	STA PTR_READ_DEST 
+	LDA TH_START+1
+	STA PTR_READ_DEST+1
+										; REPEAT; 
+ZZ0002
+										; DO; 
+										; CALL ReadUSBData2; 
+	JSR ReadUSBData2 
+										; .A = PTR_READ_DEST_L; 
+	LDA PTR_READ_DEST_L 
+										; IF ^.Z THEN INC PTR_READ_DEST_H; 
+	BEQ ZZ0003 
+	INC PTR_READ_DEST_H 
+										; DEC PTR_READ_DEST_L; 
+ZZ0003
+	DEC PTR_READ_DEST_L 
+										; CALL ByteRdGo; 
+	JSR ByteRdGo 
+										; END; 
+										; UNTIL ^.Z; 
+	BEQ ZZ0002 
+										; CALL FileClose; 
+	JSR FileClose 
+
+	; Appel a la ROM v1.1: Mise a jour eventuelle des liens BASIC 
+	; Remarque: on n'en revient jamais sauf si mode AUTO -> 
+	; a remplacer par: UNSTACK .A; UNSTACK .A; GOTO EndTapeLoad; ? 
+	; CALL EndTapeLoad; 
+										; GOTO EndTapeLoad; 
+	JMP EndTapeLoad 
+										;RETURN; 
+	RTS 
+
+;---------------------------------------------------------------------------
+; OpenTape: 
+; Ouvre un fichier .tap et charge son entete 
+; 
+; Entree: 
+; 
+; Sortie: 
+; TH_ERROR: Code erreur 
+; 
+;---------------------------------------------------------------------------
+										;TapeError: 
+TapeError 
+										; TH_ERROR = .A; 
+	STA TH_ERROR 
+										; CALL Print_ErrorFound; 
+	JSR Print_ErrorFound 
+										; CALL FileClose; 
+	JSR FileClose 
+										;RETURN; 
+	RTS 
+										;OpenTape: 
+OpenTape 
+										; CALL InitCH376; 
+	JSR InitCH376 
+										; IFF ^.Z THEN TapeError; 
+	BNE TapeError 
+
+	; TODO: Faire un test sur la longueur du fichier 
+										; CALL Print_Searching; 
+	JSR Print_Searching 
+
+	; Ouverture de l'image tape 
+										; .AY =## TNAME; 
+	LDA #<TNAME 
+	LDY #>TNAME 
+										; CALL SetFilename; 
+	JSR SetFilename 
+										; CALL FileOpen; 
+	JSR FileOpen 
+										; IFF .A ^= $14 THEN TapeError; 
+	CMP #$14
+	BNE TapeError 
+										; .A = $FF; 
+	LDA #$FF
+										; .Y = .A; 
+	TAY
+										; CALL SetByteRead; 
+	JSR SetByteRead 
+										; IFF ^.Z THEN TapeError; 
+	BNE TapeError 
+										; .AY =## BUFFER; 
+	LDA #<BUFFER 
+	LDY #>BUFFER 
+										; CALL ReadUSBData; 
+	JSR ReadUSBData 
+
+	; Si le fichier fait moins de 16 caracteres -> Erreur 
+										; IFF .Y < 16 THEN TapeError; 
+	CPY #16
+	BCC TapeError 
+										; .Y = 0; 
+	LDY #0
+										; .A = BUFFER[.Y]; IFF .A ^= $16 THEN TapeError; 
+	LDA BUFFER,Y
+	CMP #$16
+	BNE TapeError 
+										; REPEAT; 
+ZZ0004
+										; BEGIN; 
+										; INC .Y; 
+	INY
+										; .A = BUFFER[.Y]; 
+	LDA BUFFER,Y
+										; END; 
+										; UNTIL .A ^= $16; 
+	CMP #$16
+	BNE  *+5
+	JMP ZZ0004 
+										; IFF .A ^= $24 THEN TapeError; 
+	CMP #$24
+	BNE TapeError 
+
+	; Pour les tableaux 
+										; INC .Y; TH_INTEGER_FLAG = BUFFER[.Y]; 
+	INY
+	LDA BUFFER,Y
+	STA TH_INTEGER_FLAG 
+										; INC .Y; TH_STRING_FLAG = BUFFER[.Y]; 
+	INY
+	LDA BUFFER,Y
+	STA TH_STRING_FLAG 
+
+	; Type de fichier (Basic, LM, Array)
+										; INC .Y; TH_TYPE = BUFFER[.Y]; 
+	INY
+	LDA BUFFER,Y
+	STA TH_TYPE 
+
+	; Autostart? 
+										; INC .Y; TH_AUTO = BUFFER[.Y]; 
+	INY
+	LDA BUFFER,Y
+	STA TH_AUTO 
+
+	; Adresse de fin 
+										; INC .Y; TH_END_H = BUFFER[.Y]; INC .Y; TH_END_L = BUFFER[.Y]; 
+	INY
+	LDA BUFFER,Y
+	STA TH_END_H 
+	INY
+	LDA BUFFER,Y
+	STA TH_END_L 
+
+	; Adresse de debut 
+										; INC .Y; TH_START_H = BUFFER[.Y]; INC .Y; TH_START_L = BUFFER[.Y]; 
+	INY
+	LDA BUFFER,Y
+	STA TH_START_H 
+	INY
+	LDA BUFFER,Y
+	STA TH_START_L 
+										; INC .Y; " TH_UNUSED = .A; "; 
+	INY
+										; .X = $FF; 
+	LDX #$FF
+										; REPEAT; 
+ZZ0005
+										; BEGIN; 
+										; INC .Y; 
+	INY
+										; INC .X; 
+	INX
+										; .A = BUFFER[.Y]; 
+	LDA BUFFER,Y
+										; 'STA TH_NAME,X'; 
+	STA TH_NAME,X
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0005 
+										; TH_ERROR = .A; 
+	STA TH_ERROR 
+										; INC .Y; 
+	INY
+										; PTR = .Y; 
+	STY PTR 
+										; CALL Print_Found; 
+	JSR Print_Found 
+										;RETURN; 
+	RTS 
+
+;---------------------------------------------------------------------------
+; Fin du programme 
+;---------------------------------------------------------------------------
+										;'#include "lib/CH376.s"'; 
+#include "lib/CH376.s"
+										;EXIT; 
+END
