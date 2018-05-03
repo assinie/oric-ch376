@@ -1,0 +1,860 @@
+
+; Si on utilise les routines CH376 de la ROM
+; Permet de diminuer le code de 97 octets
+;#define UseRomCH376
+
+; Ajoute les options AUTO et LIST
+#define ParamsToken
+
+#define Jasmin 1
+#define Microdisc 2
+#define Telestrat 3
+#define Auto 0
+
+
+#ifndef Controler
+#define Controler Auto
+#endif
+
+;---------------------------------------------------------------------------
+;
+; Codes d'erreur du CH376
+;
+;---------------------------------------------------------------------------
+#define SUCCESS $12
+#define INT_SUCCESS $14
+#define INT_DISK_READ $1D
+#define INT_DISK_WRITE $1E
+#define ABORT $5F
+
+;---------------------------------------------------------------------------
+;
+; Variables en page 0
+;
+;---------------------------------------------------------------------------
+        *=0
+;	*=$fe
+
+PTR_READ_DEST  *=*+2
+	PTR_READ_DEST_L=PTR_READ_DEST
+	PTR_READ_DEST_H=PTR_READ_DEST+1
+
+AutoStart *=*+1
+
+	* = $91
+StrPtr  *=*+2
+
+	* = $E9
+TXTPTR * = *+2
+
+;---------------------------------------------------------------------------
+;
+; Variables en page 2
+;
+;---------------------------------------------------------------------------
+
+;---------------------------------------------------------------------------
+;
+; Adresse de l'interface CH376
+;
+;---------------------------------------------------------------------------
+CH376_COMMAND = $341
+CH376_DATA    = $340
+
+;---------------------------------------------------------------------------
+;
+; Adresse du VIA
+;
+;---------------------------------------------------------------------------
+via_IER = $30E
+via_ACR = $30B
+
+;---------------------------------------------------------------------------
+;
+; Adresses Jasmin
+;
+;---------------------------------------------------------------------------
+jsm_Overlay = $3FA
+jsm_Romdis  = $3FB
+
+;---------------------------------------------------------------------------
+;
+; Adresses Telestrat
+;
+;---------------------------------------------------------------------------
+V2DRA = $321
+V2ACR = $32B
+
+;---------------------------------------------------------------------------
+;
+; Adresses des Routines ROM v1.0
+;
+;---------------------------------------------------------------------------
+;Print=$CB61
+;EvalExpr=$CEBB
+;SyntaxError=$CFE4
+;CheckStr=$D712
+
+;---------------------------------------------------------------------------
+;
+; Adresses des Routines ROM v1.1
+;
+;---------------------------------------------------------------------------
+CharGet        = $00E2
+
+Print          = $CBAB
+ErrorX         = $C47E
+
+PrintString    = $CCB0
+EvalExpr       = $CF17
+EvalComma      = $D065
+SyntaxError    = $D070
+OutOfDataError = $D35C
+
+CheckStr       = $D7CD
+
+GetInt         = $E853
+HIMEM          = $EBCE
+
+#define Token_AUTO $C7
+#define Token_LIST $BC
+
+;---------------------------------------------------------------------------
+;
+; Adresses des Routines ROM v1.1 CH376
+;
+;---------------------------------------------------------------------------
+#ifdef UseRomCH376
+#echo Utilisation de la ROM CH376: Oui
+	InitCH376   = $E76A
+	FileOpen    = $E707
+	SetByteRead = $E78C
+	ByteRdGo    = $E7A0
+	FileClose   = $E715
+#else
+#echo Utilisation de la ROM CH376: Non
+	UndefinedFunctionError = $D4DA
+#endif
+
+
+;---------------------------------------------------------------------------
+;
+; Adresses des Routines FTDOS
+;
+;---------------------------------------------------------------------------
+FTDOS_Cold_Start = $D4F8
+
+;---------------------------------------------------------------------------
+;
+; Adresses des Buffers ou Tables
+;
+;---------------------------------------------------------------------------
+RAM_OVL = $C000
+
+;---------------------------------------------------------------------------
+;
+; En-tete fichier .tap
+;
+;---------------------------------------------------------------------------
+AUTOEXEC= 04
+.db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
+.db >END, <END, >($9600-$4F), <($9600-$4F), $0B, "LOAD-OVL", $00
+
+;---------------------------------------------------------------------------
+;
+; Variables et buffers
+;
+;---------------------------------------------------------------------------
+	*=$9600-$4F
+
+;.word LoadOverlay
+;BUFFER  .dsb 256,0
+
+
+;---------------------------------------------------------------------------
+; Initialisation
+; Non protégée par le HIMEM
+;---------------------------------------------------------------------------
+Init
+	; Cherche le contrôleur
+	jsr CheckControler
+	beq NoControler
+
+	; Modifie le type du contrôleur dans le message
+	sta LoadOverlay-3
+
+	; Indique le type du controleur trouvé et fin
+	lda #<Message
+	ldy #>Message
+	jsr PrintString
+
+	; Protège le programme et initialise "!"
+	; /!\ HIMEM initialise la pile du 6502 (fait un CLEAR à la fin)
+	lda #<LoadOverlay
+	ldy #>LoadOverlay
+	sta $02f5
+	sty $02f6
+	jmp HIMEM+10
+
+NoControler
+	; Message d'erreur
+	lda #<ErrMessage
+	ldy #>ErrMessage
+	jmp PrintString
+
+ErrMessage
+	.asc "No controler found",$0a,0
+Message
+	.asc "Found controler type 0",$0a,0
+
+;---------------------------------------------------------------------------
+;
+; Debut du programme
+;
+; Syntaxe:
+; CALL LoadOverlay "FICHIER.ROM" [,Base[,Start]]
+;	Base : Adresse de chargement (défaut: $C000)
+;	Start: Adresse de démarrage (dèfaut: retour au Basic) | AUTO | LIST
+;		AUTO: Démarre la ROM à l'adresse spécifiée en $FFFC-FFFD (RESET)
+;		LIST: Affiche le nom de la ROM (cf banques Telestrat / Orix)
+;			Attention: charge quand même la ROM
+;---------------------------------------------------------------------------
+
+LoadOverlay
+	JSR InitCH376
+	BNE Error
+;	LDA #<BUFFER
+;	LDY #>BUFFER
+;	JSR ReadUSBData
+
+	JSR GetParam
+	BNE ZZ0001
+	JMP SyntaxError
+ZZ0001
+;	LDA #<FNAME
+;	LDY #>FNAME
+
+	; XY = StrPtr
+	; A  = Longueur de la chaine
+	JSR SetFilename
+	JSR FileOpen
+	CMP #$14
+	BNE Error
+
+	LDA #$FF
+	TAY
+	JSR SetByteRead
+	BNE Error
+
+	jsr OverlayOn
+
+ZZ0002
+	JSR ReadUSBData2
+	; Si C=1 -> On n'a rien lu, on relance une lecture
+	; Pour prendre en compte le fait que le CH376 renvoi de temps en temps 0 octets
+	; lors de la commande ReadUSBData
+	bcs ReadNextChunk
+
+	; Calcule PTR_READ_DEST += $FF
+	LDA PTR_READ_DEST_L
+	BEQ ZZ0003
+	INC PTR_READ_DEST_H
+ZZ0003
+	DEC PTR_READ_DEST_L
+
+ReadNextChunk
+#ifdef UseRomCH376
+	jsr OverlayOff
+	JSR ByteRdGo
+	; Sauvegarde P pour le test BEQ ZZ0002
+	php
+	jsr OverlayOn
+	plp
+#else
+	JSR ByteRdGo
+#endif
+
+	BEQ ZZ0002
+
+#ifdef UseRomCH376
+	jsr OverlayOff
+	JSR FileClose
+	jsr OverlayOn
+#else
+	JSR FileClose
+#endif
+
+#ifdef ParamsToken
+	; Gestion AutoStart
+	; Token_AUTO := $C7 => b7=1, b6=1
+	; Token_LIST := $BC => b7=1, b6=0
+	bit AutoStart
+	bpl Start_FTDOS
+	bvs ROM_AutoStart
+ROM_LIST
+	lda $fff8
+	ldy $fff9
+	jsr PrintString
+	jmp Start_FTDOS
+
+ROM_AutoStart
+	lda $fffc
+	ldy $fffd
+	sta Start_FTDOS+1
+	sty Start_FTDOS+2
+#endif
+
+Start_FTDOS
+	jmp FTDOS_Cold_Start
+;	jmp OverlayOff
+
+	rts
+Error
+	jmp OutOfDataError
+
+;	rts
+
+;---------------------------------------------------------------------------
+; GetParam:
+; Recupere le nom du fichier à charger
+;
+; Entree:
+;
+; Sortie:
+; A: 0 -> Pas de commande, !=0 -> OK
+; X,Y: Adresse de la chaine
+;
+;---------------------------------------------------------------------------
+GetParam
+	; Adresse de chargement par défaut
+	LDA #<RAM_OVL
+	LDY #>RAM_OVL
+	STA PTR_READ_DEST
+	STY PTR_READ_DEST+1
+
+	; Adresse de démarrage par défaut
+	lda #<OverlayOff
+	ldy #>OverlayOff
+	sta Start_FTDOS+1
+	sty Start_FTDOS+2
+
+#ifdef ParamsToken
+	; Flag AutoStart: Démarrage à l'adresse indiquée dans le vecteur RESET
+	lda #$00
+	sta AutoStart
+#endif
+
+	; jsr EvalComma ; $D065
+	; Evalue le parametre
+	JSR EvalExpr
+
+	; Recupere le parametre, erreur si pas une chaine
+	; XY : Adresse de la chaine
+	; $91-92 : Adresse de la chaine
+	; A : Longueur de la chaine
+	; P : Suivant le contenu de A
+	JSR CheckStr
+	BEQ ZZ0005
+
+	; IF .A >=9 THEN .A = 8;
+	CMP #13
+	BCS  *+5
+	JMP ZZ0005
+	LDA #13
+
+ZZ0005
+	; Sauvegarde la longueur de la chaine
+	pha
+	; Sauvegarde l'adresse de la chaine, sinon elle est écrasée par getInt
+	; MSB
+	tya
+	pha
+	; LSB
+	txa
+	pha
+
+	; Récupère l'adresse de chargement (Defaut: $C000)
+	ldy #$00
+	lda #","
+	cmp (TXTPTR),y
+	bne ZZ0006
+	jsr CharGet
+	; Vérifie la syntaxe CALL #9600, "FICHIER",,Start
+	cmp #","
+	beq Param2_AUTO
+	jsr GetInt ; $E853
+	sty PTR_READ_DEST_L
+	sta PTR_READ_DEST_H
+
+Param2
+	; Récupère l'adresse de démarrage (Defaut: OverlayOff <=> retour au BASIC)
+	ldy #$00
+	lda #','
+	cmp (TXTPTR),y
+	bne ZZ0006
+
+Param2_AUTO
+	jsr CharGet
+
+#ifdef ParamsToken
+	cmp #Token_AUTO
+	bne Param2_LIST
+Param2_save
+	sta AutoStart
+	jsr CharGet
+	sec
+	bcs ZZ0006
+
+Param2_LIST
+	cmp #Token_LIST
+	bne Param2_Int
+	beq Param2_save
+#endif
+
+Param2_Int
+	jsr GetInt ; $E853
+	sty Start_FTDOS+1
+	sta Start_FTDOS+2
+
+ZZ0006
+	; Restaure l'adresse de la chaine
+	pla
+	sta StrPtr
+	pla
+	sta StrPtr+1
+	; Restaure la longueur de la chaine
+	pla
+
+	RTS
+
+
+;---------------------------------------------------------------------------
+; Gestion de la RAM Overlay
+;---------------------------------------------------------------------------
+
+#if Controler=Jasmin
+#echo Controleur: Jasmin
+OverlayOn
+	sei
+	lda #$7f
+	sta via_IER
+
+	lda #$01
+	sta jsm_Overlay
+	rts
+
+OverlayOff
+	lda #$00
+	sta jsm_Overlay
+
+	lda #$c0
+	sta via_IER
+	cli
+	rts
+
+CheckControler
+CheckJasmin
+	; Présence d'un Jasmin?
+	; On lit la valeur de jsm_Romdis ($03FB)
+	lda jsm_Romdis
+	cmp #$40		; Valeur de via_ACR ($030B)
+	beq Overlay_KO
+	lda #Jasmin+$30
+	rts
+
+Overlay_KO
+	lda #$00
+	rts
+#endif
+
+#if Controler=Telestrat
+#echo Controleur: Telestrat
+CheckControler
+CheckTelestrat
+	; On lit la valeur de via_ACR ($03FB)
+	lda via_ACR
+	; Ici ACC = $40
+	; Si V2ACR ($032B) != via_ACR ($030B) => on a 2 via <=> Telestrat ou carte Jede
+	cmp V2ACR
+	beq Overlay_KO
+	lda #Telestrat+$30
+	rts
+
+Overlay_KO
+	lda #$00
+	rts
+
+OverlayOn
+	sei
+	lda #$7f
+	sta via_IER
+
+	lda V2DRA
+	and #%11111000 ; switch to overlay ram
+	sta V2DRA
+	rts
+
+OverlayOff
+	lda V2DRA
+	and #%11111000 ; switch to rom (bank 6)
+	ora #$06
+	sta V2DRA
+
+	lda #$c0
+	sta via_IER
+	cli
+	rts
+#endif
+
+#if Controler=Microdisc
+#echo Controleur: Microdisc
+CheckControler
+CheckMicrodisc
+	; Vérifie si on a un Oric/Atmos + Microdisc
+	cmp #$ff
+	bne Overlay_KO
+	; On lit le registre une seconde fois
+	; au cas où on n'aurait pas eu de chance avec la valeur de via_T1CL
+	lda $314		; Registre intrq du microdisc
+	cmp #$ff
+	bne Overlay_KO
+	lda #Microdisc+$30
+	rts
+
+Overlay_KO
+	lda #$00
+	rts
+
+OverlayOn
+	sei
+	lda #$7f
+	sta via_IER
+
+	lda #$fd
+	sta $0314
+	rts
+
+OverlayOff
+	lda #$ff
+	sta $0314
+
+	lda #$c0
+	sta via_IER
+	cli
+	rts
+
+#endif
+
+#if Controler=Auto
+#echo Controleur: Auto
+CheckControler
+CheckJasmin
+	; Présence d'un Jasmin?
+	; On lit la valeur de jsm_Romdis ($03FB)
+	lda jsm_Romdis
+	cmp #$40		; Valeur de via_ACR ($030B)
+	beq CheckTelestrat
+
+;	lda #OverlayOn_Jasmin - OverlayOn_Jasmin
+;	sta OverlayOn+7
+	lda #OverlayOff_Jasmin - OverlayOff-3
+	sta OverlayOff+2
+
+	lda #Jasmin+$30
+	rts
+
+CheckTelestrat
+	; Ici ACC = $40
+	; Si V2ACR ($032B) != via_ACR ($030B) => on a 2 via <=> Telestrat ou carte Jede
+	cmp V2ACR
+	beq CheckMicrodisc
+
+	lda #OverlayOn_Telestrat - OverlayOn_Jasmin
+	sta OverlayOn+7
+	lda #OverlayOff_Telestrat - OverlayOff-3
+	sta OverlayOff+2
+
+	lda #Telestrat+$30
+	rts
+
+CheckMicrodisc
+	; Vérifie si on a un Oric/Atmos + Microdisc
+	lda $314		; Registre intrq du microdisc
+	cmp #$ff
+	bne Overlay_KO
+	; On lit le registre une seconde fois
+	; au cas où on n'aurait pas eu de chance avec la valeur de via_T1CL
+	lda $314		; Registre intrq du microdisc
+	cmp #$ff
+	bne Overlay_KO
+
+	lda #OverlayOn_Microdisc - OverlayOn_Jasmin
+	sta OverlayOn+7
+	lda #OverlayOff_Microdisc - OverlayOff-3
+	sta OverlayOff+2
+
+	lda #Microdisc+$30
+	rts
+
+Overlay_KO
+	lda #$00
+	rts
+
+OverlayOn
+	sei
+	lda #$7f
+	sta via_IER
+	bne OverlayOn_Jasmin	; Modifié par CheckControler
+
+OverlayOn_Jasmin
+	lda #$01
+	sta jsm_Overlay
+	rts
+
+OverlayOn_Telestrat
+	lda V2DRA
+	and #%11111000 ; switch to overlay ram
+	sta V2DRA
+	rts
+
+OverlayOn_Microdisc
+	lda #$fd
+	sta $0314
+	rts
+
+
+OverlayOff
+	sec
+	bcs OverlayOff_Jasmin	; Modifié par CheckControler
+	lda #$c0
+	sta via_IER
+	cli
+	rts
+
+OverlayOff_Jasmin
+	lda #$00
+	sta jsm_Overlay
+	bcs OverlayOff+3
+
+OverlayOff_Telestrat
+	lda V2DRA
+	and #%11111000 ; switch to rom (bank 6)
+	ora #$06
+	sta V2DRA
+	bcs OverlayOff+3
+
+OverlayOff_Microdisc
+	lda #$ff
+	sta $0314
+	bcs OverlayOff+3
+#endif
+
+; ==========================================================================
+; Librairie CH376
+; ==========================================================================
+
+;---------------------------------------------------------------------------
+; InitCH376:
+; Verifie la presence du CH376 et monte la cle
+;
+; Entree:
+;
+; Sortie:
+;
+;---------------------------------------------------------------------------
+; 34 Octets
+;---------------------------------------------------------------------------
+#ifndef UseRomCH376
+InitCH376
+Exists
+	LDX #6
+	STX CH376_COMMAND
+	LDA #$FF
+	STA CH376_DATA
+	LDA CH376_DATA
+	BNE InitError
+SetUSB
+	LDA #$15
+	STA CH376_COMMAND
+;	LDX #6
+	STX CH376_DATA
+
+	;Wait 10us
+	NOP
+	NOP
+	JSR Mount
+
+	BNE InitError
+	RTS
+
+InitError
+	JMP UndefinedFunctionError
+;	ldx #$D7
+;	jmp $C47E	; "?CAN'T CONTINUE ERROR"
+;	jmp $D35C	; "?OUT OF DATA ERROR"
+
+;	jmp $E651	; Si $02B1 != 0 -> jmp $E656
+;	jmp $E656	; "Errors found" (mais pas de retour au BASIC)
+#endif
+
+;---------------------------------------------------------------------------
+; Sortie:
+;	C: 0-> Ok, 1-> On n'a rien lu
+;---------------------------------------------------------------------------
+ReadUSBData
+		sta PTR_READ_DEST
+		sty PTR_READ_DEST+1
+ReadUSBData2
+		sec			; Pour pouvoir vérifier si on a lu quelque chose
+		lda #$27
+		sta CH376_COMMAND
+		ldx CH376_DATA
+		beq ZZZ002
+
+		ldy #$00
+ZZZ003
+		lda CH376_DATA
+		sta (PTR_READ_DEST),y
+		iny
+		dex
+		bne ZZZ003
+		clc			; Indique qu'on a lu quelque chose
+ZZZ002
+#ifdef DEBUG
+		bcc ReadUSBData_End
+		inc DEBUG_ERROR
+		.byte $24
+DEBUG_ERROR
+		.byte $00
+ReadUSBData_End
+#endif
+		rts
+
+;---------------------------------------------------------------------------
+; 26 Octets
+;---------------------------------------------------------------------------
+SetFilename
+		;stx PTR_READ_DEST
+		;sty PTR_READ_DEST+1
+
+		; Copie la longueur de la chaine dans X
+		tax
+
+		lda #$2f
+		sta CH376_COMMAND
+		sta CH376_DATA		; Pour ouverture de '/'
+		ldy #$ff
+ZZZ004
+		iny
+		;lda (PTR_READ_DEST),y
+		lda (StrPtr),y
+		sta CH376_DATA
+		dex
+		bne ZZZ004
+
+		; Ajoute le '\0' final
+		lda #$00
+		sta CH376_DATA
+		rts
+
+;---------------------------------------------------------------------------
+; 28 Octets
+;---------------------------------------------------------------------------
+#ifndef UseRomCH376
+Mount
+	LDA #$31
+	.byte $2c
+
+FileOpen
+	LDA #$32
+	.byte $2c
+
+FileCreate
+	LDA #$34
+
+CH376_Cmd
+	STA CH376_COMMAND
+
+CH376_CmdWait
+	JSR WaitResponse
+	CMP #INT_SUCCESS
+	RTS
+;---------------------------------------------------------------------------
+FileClose
+	LDX #$36
+	STX CH376_COMMAND
+	STA CH376_DATA
+
+	CLC									; Saut inconditionel
+	BCC CH376_CmdWait
+
+
+;---------------------------------------------------------------------------
+SetByteRead
+	LDX #$3A
+
+CH376_Cmd2
+	STX CH376_COMMAND
+	STA CH376_DATA
+	STY CH376_DATA
+
+CH376_CmdWait2
+	JSR WaitResponse
+	CMP #INT_DISK_READ
+	RTS
+;---------------------------------------------------------------------------
+ByteRdGo
+	LDA #$3B
+	STA CH376_COMMAND
+	BNE CH376_CmdWait2
+
+;---------------------------------------------------------------------------
+; WaitResponse:
+; A voir si il faut preserver X et Y
+;
+; Entree:
+;
+; Sortie:
+; Z: 0 -> ACC: Status du CH376
+; Z: 1 -> Timeout
+; X,Y: Modifies
+;---------------------------------------------------------------------------
+; 25 Octets
+;---------------------------------------------------------------------------
+WaitResponse
+	LDY #$FF
+ZZZ009
+	LDX #$FF
+ZZZ010
+	LDA CH376_COMMAND
+	BMI ZZZ011
+	LDA #$22
+	STA CH376_COMMAND
+	LDA CH376_DATA
+	RTS
+ZZZ011
+	DEX
+	BNE ZZZ010
+	DEY
+	BNE ZZZ009
+	RTS
+
+;---------------------------------------------------------------------------
+; Version sans Timeout: 14 Octets
+;---------------------------------------------------------------------------
+;										; REPEAT;
+;ZZZ010
+;										; .A = CH376_COMMAND;
+;	lda CH376_COMMAND
+;										; UNTIL -;
+;	bpl zzz010
+;										; CH376_COMMAND = $22;
+;	lda #$22
+;	sta CH376_COMMAND
+;										; .A = CH376_DATA;
+;	lda CH376_DATA
+;										; RETURN;
+;	rts
+#endif
+
+END
