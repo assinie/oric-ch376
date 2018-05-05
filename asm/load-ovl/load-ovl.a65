@@ -156,7 +156,7 @@ RAM_OVL = $C000
 ; En-tete fichier .tap
 ;
 ;---------------------------------------------------------------------------
-AUTOEXEC= 04
+#define AUTOEXEC 04
 .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
 .db >END, <END, >($9600-$4F), <($9600-$4F), $0B, "LOAD-OVL", $00
 
@@ -230,6 +230,7 @@ LoadOverlay
 	JSR GetParam
 	BNE ZZ0001
 	JMP SyntaxError
+
 ZZ0001
 ;	LDA #<FNAME
 ;	LDY #>FNAME
@@ -251,16 +252,21 @@ ZZ0001
 ZZ0002
 	JSR ReadUSBData2
 	; Si C=1 -> On n'a rien lu, on relance une lecture
-	; Pour prendre en compte le fait que le CH376 renvoi de temps en temps 0 octets
-	; lors de la commande ReadUSBData
 	bcs ReadNextChunk
 
+	; Ajuste le pointeur
+	tya
+	adc PTR_READ_DEST_L
+	sta PTR_READ_DEST_L
+	bcc ReadNextChunk
+	inc PTR_READ_DEST_H
+
 	; Calcule PTR_READ_DEST += $FF
-	LDA PTR_READ_DEST_L
-	BEQ ZZ0003
-	INC PTR_READ_DEST_H
-ZZ0003
-	DEC PTR_READ_DEST_L
+;	LDA PTR_READ_DEST_L
+;	BEQ ZZ0003
+;	INC PTR_READ_DEST_H
+;ZZ0003
+;	DEC PTR_READ_DEST_L
 
 ReadNextChunk
 #ifdef UseRomCH376
