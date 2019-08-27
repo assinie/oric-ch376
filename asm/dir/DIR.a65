@@ -1,0 +1,391 @@
+#define WOR word
+
+#include <include/CH376.h>'
+
+;----------------------------------------------------------------------
+;				Page Zéro
+;----------------------------------------------------------------------
+
+;PTR_READ_DEST	:= 0
+;ERRNO		:= 4
+LINESIZE   = $26			; Trouver un autre label
+VARFOUND   = $27
+ARRAY_FLAG = $2B
+
+TMP_STR    = $A4
+
+VARNAME1   = $B4
+VARNAME2   = $B5
+VAR_ADDR   = $B6
+
+; 2 octets: index de FI$(), index de DI$()
+ArrayIndex = $F7
+
+;----------------------------------------------------------------------
+;			Déclarations ROM Atmos
+;----------------------------------------------------------------------
+CharGet         = $00e2
+CharGot         = $00e8
+GetVarFromText  = $d188
+
+CpyStr          = $d7b2
+NewStr          = $d61e
+FreeStr         = $d7d0
+FindVar         = $d1e8
+FindArrayElt    = $d306
+GIVAYF          = $d499
+MOVMF           = $dead
+
+EvalExpr        = $CF17
+SyntaxError     = $D070
+CheckStr        = $D7CD
+
+;----------------------------------------------------------------------
+;				Defines
+;----------------------------------------------------------------------
+#define ERR_MISS_FILE $42
+
+
+;----------------------------------------------------------------------
+;				Utilisation
+;----------------------------------------------------------------------
+;
+;  10 HIMEM #9600
+;  20 DIM FI$(255), DI$(255)
+;  30 CLS: PAPER 0: INK 2
+;  40 CALL #9600
+;  50 PRINT "ER=";ER
+;  60 PRINT "FI=";FI
+;  70 PRINT "DI=";DI
+;  80 IF ER THEN PRINT "Erreur": END
+;  90 GET Z$: PRINT
+; 100 FOR I=0 TO DI
+; 110 PRINT LEFT$(DI$(I),8);" ";RIGHT$(DI$(I),3))
+; 120 NEXT
+; 130 GET Z$: PRINT
+; 200 FOR I=0 TO FI
+; 210 PRINT LEFT$(FI$(I),8);" ";RIGHT$(FI$(I),3))
+; 220 NEXT
+;
+;
+;
+;
+;
+
+;---------------------------------------------------------------------------;
+;                                                                           ;
+;                       En-tete fichier .tap                                ;
+;                                                                           ;
+;---------------------------------------------------------------------------;
+										;'AUTOEXEC = 0';
+AUTOEXEC= 0
+										;'        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
+        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
+										;'        .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-DIR", $00';
+        .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-DIR", $00
+
+;---------------------------------------------------------------------------;
+;                                                                           ;
+;                         Variables et buffers                              ;
+;                                                                           ;
+;---------------------------------------------------------------------------;
+*=$9600-2
+										;DATAW Dir;
+.WORD Dir
+										;DECLARE DIRNAME CHARACTER['/'];
+DIRNAME .BYT '/'
+										;DATA 0,0,0,0,0,0,0,0,0,0,0;
+.BYT 0,0,0,0,0,0,0,0,0,0,0
+										;VARTABLE:
+VARTABLE
+										; " Arrays";
+										; STRING 'FI';
+.BYT 'F',$C9
+										; STRING 'DI';
+.BYT 'D',$C9
+										; " Float vars";
+										; DECLARE FI CHARACTER['FI'];
+FI .BYT 'FI'
+										; DECLARE DI CHARACTER['DI'];
+DI .BYT 'DI'
+										; DECLARE ER CHARACTER['ER'];
+ER .BYT 'ER'
+										;DECLARE DIRFILTER CHARACTER['*'];
+DIRFILTER .BYT '*'
+										;DATA 0;
+.BYT 0
+										;DECLARE BUFFER[32];
+BUFFER  *=*+32
+;'.dsb 32,0';;
+
+;---------------------------------------------------------------------------;
+;                                                                           ;
+;                        Debut du programme                                 ;
+;                                                                           ;
+;---------------------------------------------------------------------------;
+;.text
+
+Dir:
+	jsr GetParams
+	beq *+5
+	jmp SyntaxError
+
+	jsr InitCH376
+	bne Error
+
+	lda #$ff
+	sta ArrayIndex				; Index FI
+	sta ArrayIndex+1			; Index DI
+
+	lda #<DirName
+	ldy #>DirName
+	jsr SetFilename
+	jsr FileOpen				; $41: ERR_OPEN_DIR / $42: ERR_MISS_FILE / $14: INT_SUCCESS (c'est un fichier)
+	cmp #ERR_MISS_FILE
+	beq Error
+
+	lda #<DirFilter
+	ldy #>DirFilter
+	jsr SetFilename
+	jsr FileOpen
+
+	cmp #INT_DISK_READ
+	bne Error
+
+Next:
+	lda #<Buffer
+	ldy #>Buffer
+	jsr ReadUSBData
+
+	ldx #$00				; Index pour FI$
+
+	lda Buffer+11
+	cmp #$10				; Répertoire?
+	bne File
+	ldx #$01				; Index pour DI$
+	;beq skip
+
+File:
+	inc ArrayIndex,x
+	jsr AddElt
+skip:
+	jsr FileEnumGo
+	beq Next
+
+	ldy ArrayIndex				; Valeur de la variable (poids faible)
+	lda #$00
+	ldx #$03				; Index de la variable "FI"
+	jsr SetCH376Var
+
+	ldy ArrayIndex+1			; Valeur de la variable (poids faible)
+	lda #$00
+	ldx #$04				; Index de la variable "DI"
+	jsr SetCH376Var
+
+	lda #$00				; Indique pas d'erreur
+
+Error:
+	tay
+	lda #$00
+	ldx #$02				; Index de "ER"
+	jsr SetCH376Var
+	rts
+
+;----------------------------------------------------------------------
+;			Récupération des paramètres
+;----------------------------------------------------------------------
+GetParams:
+	; Récupère le répertoire
+	jsr EvalExpr
+	jsr CheckStr
+	beq GetParams_err
+
+	; 2ième paramètre : nom du tableau pour les fichiers
+	jsr CharGot
+	beq GetParams_end			; Fin de la ligne
+	cmp #','
+	bne GetParams_err			; Pas une ',' -> SyntaxError
+
+	jsr CharGet
+
+	lda #$40				; Tableau uniquement
+	sta $2b
+	jsr GetVarFromText
+	ldx $28
+	cpx #$ff				; Tableau de chaines?
+	bne GetParams_err
+	lda VARNAME1				; Sauvegarde le nom du tableau
+	sta VarTable
+	sta VarTable+6				; Et de l'indice (même nom que le tableau)
+	lda VARNAME2
+	sta VarTable+1
+	and #$7f
+	sta VarTable+7
+
+	; 3ième paramètre : nom du tableau pour les répertoires
+	jsr CharGot
+	beq GetParams_end			; Fin de la ligne
+	cmp #','
+	bne GetParams_err			; Pas une ',' -> SyntaxError
+
+	jsr CharGet
+
+	lda #$40
+	sta $2b
+	jsr GetVarFromText
+	ldx $28
+	cpx #$ff				; Tableau de chaines?
+	bne GetParams_err
+	lda VARNAME1				; Sauvegarde le nom du tableau
+	sta VarTable+2
+	sta VarTable+8				; Et de l'indice (même nom que le tableau)
+	lda VARNAME2
+	sta VarTable+3
+	and #$7f
+	sta VarTable+9
+
+  GetParams_end:
+	lda #$00				; Indique Ok
+	rts
+
+  GetParams_err:
+	lda #$ff
+	rts
+
+;----------------------------------------------------------------------
+;                      Met a jour un element d'un tableau
+;----------------------------------------------------------------------
+AddElt:
+;	lda ArrayName
+;	sta VARNAME1
+;	lda ArrayName+1
+;	sta VARNAME2
+	jsr SetVarName
+	clc					; On cherche un Tableau
+	jsr FindVarArray
+
+string:
+	ldy #$02				; Sauvegarde l'adresse de la chaine
+  loop2:
+  	lda (VAR_ADDR),y
+  	sta TMP_STR-1,y
+  	dey
+  	bne loop2
+  	lda (VAR_ADDR),y			; Taille de la chaine
+  	beq vide
+
+	lda VAR_ADDR				; Libère la chaine
+	ldy VAR_ADDR+1
+	jsr FreeStr+4
+
+  vide:
+	lda #11				; Longueur de la chaine
+	jsr NewStr				; ACC=Longueur / sortie: $A4-A5 = $A2-A3=XY=adresse de la chaine, ACC = longueur de la chaine
+	ldy #$00
+	sta (VAR_ADDR),y			; Nouvelle longueur dans le descripteur
+	iny
+	lda TMP_STR				; Nouvelle adresse de la chaine dans le descripteur
+	sta (VAR_ADDR),y
+	iny
+	lda TMP_STR+1
+	sta (VAR_ADDR),y
+	lda #11				; Longueur de la chaine
+
+  affectation:
+	ldx #<Buffer				; $06-07: Adresse de la chaine source
+	ldy #>Buffer
+	jsr CpyStr				; Copie une chaine, XY: adresse de la chaine, ACC: longueur de la chaine, $A4+A5: Destination
+	rts
+
+
+;----------------------------------------------------------------------
+;                  Recherche l'adresse d'une variable/tableau
+;----------------------------------------------------------------------
+FindVarArray:
+	bcs simple
+	lda #$00
+	sta VARFOUND				; Consultation
+	sta ARRAY_FLAG				; Atmos uniquement: on veut l'adresse d'un element et non celle du tableau
+	pha					; MSB indice du tableau (<255)
+	lda #$01				; Tableau à 1 dimension
+	sta LINESIZE
+	lda ArrayIndex,x			; LSB indice du tableau
+	pha
+	jmp FindArrayElt			; Adresse dans XY t $B6-B7: (XY) longueur de la chaine
+
+simple:
+	jmp FindVar				; Adresse dans XY t $B6-B7: (XY) longueur de la chaine
+
+
+;----------------------------------------------------------------------
+;                       Met a jour une variable
+;----------------------------------------------------------------------
+SetCH376Var:
+	jsr SetVarName
+	jmp SetVar
+
+;----------------------------------------------------------------------
+;                          Prepare le nom de la variable
+;----------------------------------------------------------------------
+SetVarName:
+	pha					; Sauvegarde A pour plus tard
+	txa
+	pha					; Sauvegarde X
+	asl
+	tax
+	lda VarTable,x
+	sta VARNAME1
+	inx
+	lda VarTable,x
+	sta VARNAME2
+	pla
+	tax					; Restaure X
+	pla					; Restaure A
+	;jmp SetVar
+	rts
+
+;----------------------------------------------------------------------
+;                         Met a jour une variable flotante
+;----------------------------------------------------------------------
+SetVar:
+	jsr GIVAYF				; Conversion Entier -> FACC1
+	jsr FindVar				; Recherche la variable (adresse en AY)
+	tax					; MOVMF nécessite que l'adresse soit en XY
+	jmp MOVMF
+
+
+;----------------------------------------------------------------------
+;				DATA
+;----------------------------------------------------------------------
+;.data
+DirName:
+	;.asciiz "/"
+	.asc "/"
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+
+DirFilter:
+	;.asciiz "*"
+	.asc "*", $00
+
+; Migré en page zéro pour pouvoir faire inc ArrayIndex,x
+;ArrayIndex:
+;	.byte $ff, $ff
+
+; FI et DI doivent être au début pour correspondre à leur index en page zéro
+VarTable:
+	.byte 'F','I'+$80
+	.byte 'D','I'+$80
+	.byte "ER","FI","DI"
+
+
+Buffer:
+	;.res 32
+	.dsb 32,0
+
+;----------------------------------------------------------------------
+;                         Fin du programme
+;----------------------------------------------------------------------
+
+#include "lib/CH376.s"
+
+END
