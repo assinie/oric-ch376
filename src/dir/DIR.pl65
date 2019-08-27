@@ -13,6 +13,7 @@ DECLARE R1 ;
 
 DEFINE LINESIZE   = $26;			" Trouver un autre label";
 DEFINE VARFOUND   = $27;
+DEFINE H28        = $28;
 DEFINE ARRAY_FLAG = $2B;
 
 DEFINE TMP_STR    = $A4;
@@ -39,7 +40,7 @@ DECLARE ArrayIndex[2];
 "                   Adresses des Routines ROM v1.0                          ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
-DEFINE CharGot     = $00E2;
+DEFINE CharGet     = $00E2;
 DEFINE CharGot     = $00E8;
 DEFINE GetVarFromText = $D0FC;
 
@@ -61,7 +62,7 @@ DEFINE CheckStr    = $D712;
 "                   Adresses des Routines ROM v1.1                          ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
-DEFINE CharGot     = $00E2;
+DEFINE CharGet     = $00E2;
 DEFINE CharGot     = $00E8;
 DEFINE GetVarFromText = $D188;
 
@@ -84,6 +85,11 @@ DEFINE CheckStr    = $D7CD;
 "                                                                           ";
 "---------------------------------------------------------------------------";
 
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                            Defines                                        ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
 
 "---------------------------------------------------------------------------";
 "                                                                           ";
@@ -136,14 +142,14 @@ Dir:
 	IF .Z THEN
 	BEGIN;
 		ArrayIndex_FI = $FF;
-		ArrayIndex_DI = $FF;				" Supprimer le LDA #$FF en trop";
+		ArrayIndex_DI = $FF;						" Supprimer le LDA #$FF en trop";
 
 		.AY =## DIRNAME;
 		CALL SetFilename;
 		CALL FileOpen;
 
 		" Remplacer BNE *+5/JMP ZZnnnnn par BEQ ZZnnnnn";
-		IF .A ^= #INT_ERR_MISS_FILE THEN
+		IF .A ^= #ERR_MISS_FILE THEN
 		BEGIN;
 			.AY =## DIRFILTER;
 			CALL SetFilename;
@@ -155,13 +161,13 @@ Dir:
 				"Next:";
 				REPEAT;
 				BEGIN;
-					.AY =## Buffer;
+					.AY =## BUFFER;
 					CALL ReadUSBData;
 
-					.X = $00;		" Index pour 'FI$'";
+					.X = $00;				" Index pour 'FI$'";
 
 					" Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn";
-					IF $10 = Buffer[11] THEN .X = $01;
+					IF $10 = BUFFER[11] THEN .X = $01;
 
 					"File:";
 					'INC ArrayIndex,X';
@@ -171,17 +177,17 @@ Dir:
 				END;
 				UNTIL ^.Z;
 
-				.Y = ArrayIndex_FI;		" Valeur de la variable (poids faible)";
+				.Y = ArrayIndex_FI;				" Valeur de la variable (poids faible)";
 				.A = $00;
-				.X = $03;			" Index de la variable 'FI'";
+				.X = $02;					" Index de la variable 'FI'";
 				CALL SetCH376Var;
 
-				.Y = ArrayIndex_DI;		" Valeur de la variable (poids faible)";
+				.Y = ArrayIndex_DI;				" Valeur de la variable (poids faible)";
 				.A = $00;
-				.X = $04;			" Index de la variable 'DI'";
+				.X = $03;					" Index de la variable 'DI'";
 				CALL SetCH376Var;
 
-				.A = $00;			" Indique pas d'erreur";
+				.A = $00;					" Indique pas d'erreur";
 			END;
 		END;
 	END;
@@ -189,7 +195,7 @@ Dir:
 "Error:";
 	.Y = .A;
 	.A = $00;
-	.X = $02;		" Index de 'ER'";
+	.X = $04;		" Index de 'ER'";
 	CALL SetCH376Var;
 RETURN;
 
@@ -210,16 +216,16 @@ GetParams:
 
 			CALL CharGet;
 
-			H2B = $40;					" Tableau uniquement";
+			ARRAY_FLAG = $40;					" Tableau uniquement";
 			CALL GetVarFromText;
 
 			.X = H28;
-			IFF .X ^=$FF THEN GetParams_err;		" Tableau de chaines?";
+			IFF .X ^=$FF THEN GetParams_err;			" Tableau de chaines?";
 
-			VarTable[0] = VARNAME1;				" Sauvegarde le nom du tableau";
-			VarTable[6] = VARNAME1;				" et de l'indice";
-			VarTable[2] = VARNAME2;
-			VarTable[7] = VARNAME2 .AND $7F;
+			VARTABLE[0] = VARNAME1;					" Sauvegarde le nom du tableau";
+			VARTABLE[6] = VARNAME1;					" et de l'indice";
+			VARTABLE[1] = VARNAME2;
+			VARTABLE[7] = VARNAME2 .AND $7F;
 
 			" 3ieme parametre : nom du tableau pour les repertoires";
 			CALL CharGot;
@@ -229,16 +235,16 @@ GetParams:
 
 				CALL CharGet;
 
-				H2B = $40;					" Tableau uniquement";
+				ARRAY_FLAG = $40;				" Tableau uniquement";
 				CALL GetVarFromText;
 
 				.X = H28;
 				IFF .X ^=$FF THEN GetParams_err;		" Tableau de chaines?";
 
-				VarTable[2] = VARNAME1;				" Sauvegarde le nom du tableau";
-				VarTable[8] = VARNAME1;				" et de l'indice";
-				VarTable[9] = VARNAME2;
-				VarTable[9] = VARNAME2 .AND $7F;
+				VARTABLE[2] = VARNAME1;				" Sauvegarde le nom du tableau";
+				VARTABLE[8] = VARNAME1;				" et de l'indice";
+				VARTABLE[3] = VARNAME2;
+				VARTABLE[9] = VARNAME2 .AND $7F;
 			END;
 		END;
 
@@ -255,7 +261,7 @@ RETURN;
 AddElt:
 	CALL SetVarName;
 	CLEAR .C;			" On cherche un tableau";
-	CALL FIndVarArray;
+	CALL FindVarArray;
 
 	"String:";
 	.Y = $02;			" Sauvegarde l'adresse de la chaine";
@@ -291,14 +297,14 @@ AddElt:
 	'STA (VAR_ADDR), Y';
 
 	.A = 11;			" Longueur de la chaine";
-	.XY = ##Buffer;
+	.XY = ##BUFFER;
 	CALL CpyStr;			" Copie une chaine, XY:adresse de la chaine, ACC: longueur de la chaine, $A4-A5: Destination";
 RETURN;
 
 "---------------------------------------------------------------------------";
 "                  Recherche l'adresse d'une variable/tableau               ";
 "---------------------------------------------------------------------------";
-FindVarArry:
+FindVarArray:
 	IF ^.C THEN
 	BEGIN;
 		VARFOUND = $00;		" Consultation";
@@ -308,7 +314,7 @@ FindVarArry:
 
 		LINESIZE = $01;		" Tableau à 1 dimension";
 
-		.A = LINESIZE[.X];	" LSB indice du tableau";
+		.A = ArrayIndex[.X];	" LSB indice du tableau";
 		STACK .A;
 
 		GOTO FindArrayElt;
@@ -334,9 +340,9 @@ SetVarName:
 	SHIFT LEFT A;
 	.X = .A;
 
-	VARNAME1 = VarTable[.X];
+	VARNAME1 = VARTABLE[.X];
 	INC .X;
-	VARNAME2 = VarTable[.X];
+	VARNAME2 = VARTABLE[.X];
 
 	UNSTACK .X, .A;		" Restaure X & A";
 RETURN;
@@ -345,7 +351,7 @@ RETURN;
 "                          Met a jour une variable flotante                 ";
 "---------------------------------------------------------------------------";
 SetVar:
-	CALL GIVAY;			" Conversion Entier -> FACC1";
+	CALL GIVAYF;			" Conversion Entier -> FACC1";
 	CALL FindVar;			" Recherche la variable (adresse en AY)";
 	.X = .A;
 	GOTO MOVMF;			" MOVMF nécessite que l'adresse soit en XY";

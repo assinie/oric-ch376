@@ -59,11 +59,14 @@ DEFINE CRCHI = $8100;
 "                       Codes d'erreur du CH376                             ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
-DEFINE SUCCESS       = $12;
-DEFINE INT_SUCCESS   = $14;
-DEFINE INT_DISK_READ = $1D;
-DEFINE INT_DISK_WRITE= $1E;
-DEFINE ABORT         = $5F;
+DEFINE SUCCESS        = $12;
+DEFINE INT_SUCCESS    = $14;
+DEFINE INT_DISK_READ  = $1D;
+DEFINE INT_DISK_WRITE = $1E;
+
+DEFINE ERR_MISS_FILE  = $42;
+
+DEFINE ABORT          = $5F;
 
 "---------------------------------------------------------------------------";
 '#endif';

@@ -1,391 +1,537 @@
+										;'#define WOR word'; 
 #define WOR word
-
-#include <include/CH376.h>'
-
-;----------------------------------------------------------------------
-;				Page Zéro
-;----------------------------------------------------------------------
-
-;PTR_READ_DEST	:= 0
-;ERRNO		:= 4
-LINESIZE   = $26			; Trouver un autre label
-VARFOUND   = $27
-ARRAY_FLAG = $2B
-
-TMP_STR    = $A4
-
-VARNAME1   = $B4
-VARNAME2   = $B5
-VAR_ADDR   = $B6
-
-; 2 octets: index de FI$(), index de DI$()
-ArrayIndex = $F7
-
-;----------------------------------------------------------------------
-;			Déclarations ROM Atmos
-;----------------------------------------------------------------------
-CharGet         = $00e2
-CharGot         = $00e8
-GetVarFromText  = $d188
-
-CpyStr          = $d7b2
-NewStr          = $d61e
-FreeStr         = $d7d0
-FindVar         = $d1e8
-FindArrayElt    = $d306
-GIVAYF          = $d499
-MOVMF           = $dead
-
-EvalExpr        = $CF17
-SyntaxError     = $D070
-CheckStr        = $D7CD
-
-;----------------------------------------------------------------------
-;				Defines
-;----------------------------------------------------------------------
-#define ERR_MISS_FILE $42
-
-
-;----------------------------------------------------------------------
-;				Utilisation
-;----------------------------------------------------------------------
+										;'#include <include/CH376.h>'; 
+#include <include/CH376.h>
+;---------------------------------------------------------------------------
+; 
+; Variables en page 0 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $0A; 
+	*=$0A
+										;DECLARE R0 WORD; 
+	R0  *=*+2
+										;DECLARE R1 ; 
+	R1  *=*+1
+										;DEFINE LINESIZE = $26; " Trouver un autre label"; 
+	LINESIZE=$26
+										;DEFINE VARFOUND = $27; 
+	VARFOUND=$27
+										;DEFINE H28 = $28; 
+	H28=$28
+										;DEFINE ARRAY_FLAG = $2B; 
+	ARRAY_FLAG=$2B
+										;DEFINE TMP_STR = $A4; 
+	TMP_STR=$A4
+										; DEFINE TMP_STR_H = $A5; 
+	TMP_STR_H=$A5
+										;DEFINE VARNAME1 = $B4; 
+	VARNAME1=$B4
+										;DEFINE VARNAME2 = $B5; 
+	VARNAME2=$B5
+										;DEFINE VAR_ADDR = $B6; 
+	VAR_ADDR=$B6
+										;DEFINE * = $F7; 
+	*=$F7
+										;DECLARE ArrayIndex[2]; 
+	ArrayIndex  *=*+2
+										; DEFINE ArrayIndex_FI = ArrayIndex; 
+	ArrayIndex_FI=ArrayIndex 
+										; DEFINE ArrayIndex_DI = ArrayIndex+1; 
+	ArrayIndex_DI=ArrayIndex+1
+;---------------------------------------------------------------------------
+; 
+; Variables en page 2 
+; 
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+; 
+; Adresses des Routines ROM v1.0 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE CharGet = $00E2; 
+;	CharGet=$00E2
+										;DEFINE CharGot = $00E8; 
+;	CharGot=$00E8
+										;DEFINE GetVarFromText = $D0FC; 
+;	GetVarFromText=$D0FC
+										;DEFINE FindVar = $D158; 
+;	FindVar=$D158
+										;DEFINE FindArrayElt= $D270; 
+;	FindArrayElt=$D270
+										;DEFINE GIVAYF = $D3ED; 
+;	GIVAYF=$D3ED
+										;DEFINE NewStr = $D563; 
+;	NewStr=$D563
+										;DEFINE CpyStr = $D6F7; 
+;	CpyStr=$D6F7
+										;DEFINE FreeStr = $D715; 
+;	FreeStr=$D715
+										;DEFINE FreeStr_04 = FreeStr+4; 
+;	FreeStr_04=FreeStr+4
+										;DEFINE MOVMF = $DEA5; 
+;	MOVMF=$DEA5
+										;DEFINE EvalExpr = $CEBB; 
+;	EvalExpr=$CEBB
+										;DEFINE SyntaxError = $CFE4; 
+;	SyntaxError=$CFE4
+										;DEFINE CheckStr = $D712; 
+;	CheckStr=$D712
+;---------------------------------------------------------------------------
+; 
+; Adresses des Routines ROM v1.1 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE CharGet = $00E2; 
+	CharGet=$00E2
+										;DEFINE CharGot = $00E8; 
+	CharGot=$00E8
+										;DEFINE GetVarFromText = $D188; 
+	GetVarFromText=$D188
+										;DEFINE FindVar = $D1E8; 
+	FindVar=$D1E8
+										;DEFINE FindArrayElt= $D306; 
+	FindArrayElt=$D306
+										;DEFINE GIVAYF = $D499; 
+	GIVAYF=$D499
+										;DEFINE NewStr = $D61E; 
+	NewStr=$D61E
+										;DEFINE CpyStr = $D7B2; 
+	CpyStr=$D7B2
+										;DEFINE FreeStr = $D7D0; 
+	FreeStr=$D7D0
+										;DEFINE FreeStr_04 = FreeStr+4; 
+	FreeStr_04=FreeStr+4
+										;DEFINE MOVMF = $DEAD; 
+	MOVMF=$DEAD
+										;DEFINE EvalExpr = $CF17; 
+	EvalExpr=$CF17
+										;DEFINE SyntaxError = $D070; 
+	SyntaxError=$D070
+										;DEFINE CheckStr = $D7CD; 
+	CheckStr=$D7CD
+;---------------------------------------------------------------------------
+; 
+; Adresses des Buffers ou Tables 
+; 
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+; 
+; Defines 
+; 
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+; 
+; En-tete fichier .tap 
+; 
+;---------------------------------------------------------------------------
+										;'AUTOEXEC = 0'; 
+	AUTOEXEC= 0
+										;' .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC'; 
+	 .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
+										;' .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-DIR", $00'; 
+	 .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-DIR", $00
+;---------------------------------------------------------------------------
+; 
+; Variables et buffers 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $9600-2; 
+	*=$9600-2
+										;DATAW Dir; 
+	.WORD Dir 
+										;DECLARE DIRNAME CHARACTER['/']; 
+	DIRNAME .BYT '/'
+										;DATA 0,0,0,0,0,0,0,0,0,0,0; 
+	.BYT 0,0,0,0,0,0,0,0,0,0,0
+										;VARTABLE: 
+	VARTABLE 
+	; Arrays
+										; STRING 'FI'; 
+	.BYT 'F',$C9
+										; STRING 'DI'; 
+	.BYT 'D',$C9
+	; Float vars
+										; DECLARE FI CHARACTER['FI']; 
+	FI .BYT 'FI'
+										; DECLARE DI CHARACTER['DI']; 
+	DI .BYT 'DI'
+										; DECLARE ER CHARACTER['ER']; 
+	ER .BYT 'ER'
+										;DECLARE DIRFILTER CHARACTER['*']; 
+	DIRFILTER .BYT '*'
+										;DATA 0; 
+	.BYT 0
+										;DECLARE BUFFER[32]; 
+	BUFFER
+.dsb 32,0
+;---------------------------------------------------------------------------
+; 
+; Debut du programme 
+; 
+;---------------------------------------------------------------------------
+										;Dir: 
+	Dir 
+										; CALL GetParams; 
+	JSR GetParams 
+										; IF ^.Z THEN GOTO SyntaxError; 
+	BEQ ZZ0001 
+	JMP SyntaxError 
+										; CALL InitCH376; 
+ZZ0001
+	JSR InitCH376 
+										; IF .Z THEN 
+	BNE ZZ0002 
+										; BEGIN; 
+										; ArrayIndex_FI = $FF; 
+	LDA #$FF
+	STA ArrayIndex_FI 
+										; ArrayIndex_DI = $FF; " Supprimer le LDA #$FF en trop"; 
+	LDA #$FF
+	STA ArrayIndex_DI 
+										; .AY =## DIRNAME; 
+	LDA #<DIRNAME 
+	LDY #>DIRNAME 
+										; CALL SetFilename; 
+	JSR SetFilename 
+										; CALL FileOpen; 
+	JSR FileOpen 
+	; Remplacer BNE *+5/JMP ZZnnnnn par BEQ ZZnnnnn
+										; IF .A ^= #ERR_MISS_FILE THEN 
+	CMP #ERR_MISS_FILE 
+	BNE  *+5
+	JMP ZZ0003 
+										; BEGIN; 
+										; .AY =## DIRFILTER; 
+	LDA #<DIRFILTER 
+	LDY #>DIRFILTER 
+										; CALL SetFilename; 
+	JSR SetFilename 
+										; CALL FileOpen; 
+	JSR FileOpen 
+	; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
+										; IF .A = #INT_DISK_READ THEN 
+	CMP #INT_DISK_READ 
+	BEQ  *+5
+	JMP ZZ0004 
+										; BEGIN; 
+	;Next:
+										; REPEAT; 
+ZZ0005
+										; BEGIN; 
+										; .AY =## BUFFER; 
+	LDA #<BUFFER 
+	LDY #>BUFFER 
+										; CALL ReadUSBData; 
+	JSR ReadUSBData 
+										; .X = $00; " Index pour 'FI$'"; 
+	LDX #$00
+	; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
+										; IF $10 = BUFFER[11] THEN .X = $01; 
+	LDA 11+BUFFER 
+	CMP #$10
+	BEQ  *+5
+	JMP ZZ0006 
+	LDX #$01
+	;File:
+ZZ0006
+										; 'INC ArrayIndex,X'; 
+	INC ArrayIndex,X
+										; CALL AddElt; 
+	JSR AddElt 
+										; CALL FileEnumGo; 
+	JSR FileEnumGo 
+										; END; 
+										; UNTIL ^.Z; 
+	BEQ ZZ0005 
+										; .Y = ArrayIndex_FI; " Valeur de la variable (poids faible)"; 
+	LDY ArrayIndex_FI 
+										; .A = $00; 
+	LDA #$00
+										; .X = $02; " Index de la variable 'FI'"; 
+	LDX #$02
+										; CALL SetCH376Var; 
+	JSR SetCH376Var 
+										; .Y = ArrayIndex_DI; " Valeur de la variable (poids faible)"; 
+	LDY ArrayIndex_DI 
+										; .A = $00; 
+	LDA #$00
+										; .X = $03; " Index de la variable 'DI'"; 
+	LDX #$03
+										; CALL SetCH376Var; 
+	JSR SetCH376Var 
+										; .A = $00; " Indique pas d'erreur"; 
+	LDA #$00
+										; END; 
+										; END; 
+ZZ0004
+										; END; 
+ZZ0003
+;Error:
+ZZ0002
+										; .Y = .A; 
+	TAY
+										; .A = $00; 
+	LDA #$00
+										; .X = $04; " Index de 'ER'"; 
+	LDX #$04
+										; CALL SetCH376Var; 
+	JSR SetCH376Var 
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; Recuperation des parametres 
+;---------------------------------------------------------------------------
+										;GetParams: 
+	GetParams 
+	; Recupere le repertoire
+										; CALL EvalExpr; 
+	JSR EvalExpr 
+										; CALL CheckStr; 
+	JSR CheckStr 
+										; IF ^.Z THEN 
+	BEQ ZZ0007 
+										; BEGIN; 
+	; 2ieme parametre : nom du tableau pour les fichiers
+										; CALL CharGot; 
+	JSR CharGot 
+										; IF ^.Z THEN 
+	BEQ ZZ0008 
+										; BEGIN; 
+										; IFF .A ^= ',' THEN GetParams_err; 
+	CMP #','
+	BNE GetParams_err 
+										; CALL CharGet; 
+	JSR CharGet 
+										; ARRAY_FLAG = $40; " Tableau uniquement"; 
+	LDA #$40
+	STA ARRAY_FLAG 
+										; CALL GetVarFromText; 
+	JSR GetVarFromText 
+										; .X = H28; 
+	LDX H28 
+										; IFF .X ^=$FF THEN GetParams_err; " Tableau de chaines?"; 
+	CPX #$FF
+	BNE GetParams_err 
+										; VARTABLE[0] = VARNAME1; " Sauvegarde le nom du tableau"; 
+	LDA VARNAME1 
+	STA 0+VARTABLE 
+										; VARTABLE[6] = VARNAME1; " et de l'indice"; 
+	LDA VARNAME1 
+	STA 6+VARTABLE 
+										; VARTABLE[1] = VARNAME2; 
+	LDA VARNAME2 
+	STA 1+VARTABLE 
+										; VARTABLE[7] = VARNAME2 .AND $7F; 
+	LDA VARNAME2 
 ;
-;  10 HIMEM #9600
-;  20 DIM FI$(255), DI$(255)
-;  30 CLS: PAPER 0: INK 2
-;  40 CALL #9600
-;  50 PRINT "ER=";ER
-;  60 PRINT "FI=";FI
-;  70 PRINT "DI=";DI
-;  80 IF ER THEN PRINT "Erreur": END
-;  90 GET Z$: PRINT
-; 100 FOR I=0 TO DI
-; 110 PRINT LEFT$(DI$(I),8);" ";RIGHT$(DI$(I),3))
-; 120 NEXT
-; 130 GET Z$: PRINT
-; 200 FOR I=0 TO FI
-; 210 PRINT LEFT$(FI$(I),8);" ";RIGHT$(FI$(I),3))
-; 220 NEXT
+	AND #$7F
+	STA 7+VARTABLE 
+	; 3ieme parametre : nom du tableau pour les repertoires
+										; CALL CharGot; 
+	JSR CharGot 
+										; IF ^.Z THEN 
+	BEQ ZZ0009 
+										; BEGIN; 
+										; IFF .A ^= ',' THEN GetParams_err; 
+	CMP #','
+	BNE GetParams_err 
+										; CALL CharGet; 
+	JSR CharGet 
+										; ARRAY_FLAG = $40; " Tableau uniquement"; 
+	LDA #$40
+	STA ARRAY_FLAG 
+										; CALL GetVarFromText; 
+	JSR GetVarFromText 
+										; .X = H28; 
+	LDX H28 
+										; IFF .X ^=$FF THEN GetParams_err; " Tableau de chaines?"; 
+	CPX #$FF
+	BNE GetParams_err 
+										; VARTABLE[2] = VARNAME1; " Sauvegarde le nom du tableau"; 
+	LDA VARNAME1 
+	STA 2+VARTABLE 
+										; VARTABLE[8] = VARNAME1; " et de l'indice"; 
+	LDA VARNAME1 
+	STA 8+VARTABLE 
+										; VARTABLE[3] = VARNAME2; 
+	LDA VARNAME2 
+	STA 3+VARTABLE 
+										; VARTABLE[9] = VARNAME2 .AND $7F; 
+	LDA VARNAME2 
 ;
-;
-;
-;
-;
-
-;---------------------------------------------------------------------------;
-;                                                                           ;
-;                       En-tete fichier .tap                                ;
-;                                                                           ;
-;---------------------------------------------------------------------------;
-										;'AUTOEXEC = 0';
-AUTOEXEC= 0
-										;'        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
-        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
-										;'        .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-DIR", $00';
-        .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-DIR", $00
-
-;---------------------------------------------------------------------------;
-;                                                                           ;
-;                         Variables et buffers                              ;
-;                                                                           ;
-;---------------------------------------------------------------------------;
-*=$9600-2
-										;DATAW Dir;
-.WORD Dir
-										;DECLARE DIRNAME CHARACTER['/'];
-DIRNAME .BYT '/'
-										;DATA 0,0,0,0,0,0,0,0,0,0,0;
-.BYT 0,0,0,0,0,0,0,0,0,0,0
-										;VARTABLE:
-VARTABLE
-										; " Arrays";
-										; STRING 'FI';
-.BYT 'F',$C9
-										; STRING 'DI';
-.BYT 'D',$C9
-										; " Float vars";
-										; DECLARE FI CHARACTER['FI'];
-FI .BYT 'FI'
-										; DECLARE DI CHARACTER['DI'];
-DI .BYT 'DI'
-										; DECLARE ER CHARACTER['ER'];
-ER .BYT 'ER'
-										;DECLARE DIRFILTER CHARACTER['*'];
-DIRFILTER .BYT '*'
-										;DATA 0;
-.BYT 0
-										;DECLARE BUFFER[32];
-BUFFER  *=*+32
-;'.dsb 32,0';;
-
-;---------------------------------------------------------------------------;
-;                                                                           ;
-;                        Debut du programme                                 ;
-;                                                                           ;
-;---------------------------------------------------------------------------;
-;.text
-
-Dir:
-	jsr GetParams
-	beq *+5
-	jmp SyntaxError
-
-	jsr InitCH376
-	bne Error
-
-	lda #$ff
-	sta ArrayIndex				; Index FI
-	sta ArrayIndex+1			; Index DI
-
-	lda #<DirName
-	ldy #>DirName
-	jsr SetFilename
-	jsr FileOpen				; $41: ERR_OPEN_DIR / $42: ERR_MISS_FILE / $14: INT_SUCCESS (c'est un fichier)
-	cmp #ERR_MISS_FILE
-	beq Error
-
-	lda #<DirFilter
-	ldy #>DirFilter
-	jsr SetFilename
-	jsr FileOpen
-
-	cmp #INT_DISK_READ
-	bne Error
-
-Next:
-	lda #<Buffer
-	ldy #>Buffer
-	jsr ReadUSBData
-
-	ldx #$00				; Index pour FI$
-
-	lda Buffer+11
-	cmp #$10				; Répertoire?
-	bne File
-	ldx #$01				; Index pour DI$
-	;beq skip
-
-File:
-	inc ArrayIndex,x
-	jsr AddElt
-skip:
-	jsr FileEnumGo
-	beq Next
-
-	ldy ArrayIndex				; Valeur de la variable (poids faible)
-	lda #$00
-	ldx #$03				; Index de la variable "FI"
-	jsr SetCH376Var
-
-	ldy ArrayIndex+1			; Valeur de la variable (poids faible)
-	lda #$00
-	ldx #$04				; Index de la variable "DI"
-	jsr SetCH376Var
-
-	lda #$00				; Indique pas d'erreur
-
-Error:
-	tay
-	lda #$00
-	ldx #$02				; Index de "ER"
-	jsr SetCH376Var
-	rts
-
-;----------------------------------------------------------------------
-;			Récupération des paramètres
-;----------------------------------------------------------------------
-GetParams:
-	; Récupère le répertoire
-	jsr EvalExpr
-	jsr CheckStr
-	beq GetParams_err
-
-	; 2ième paramètre : nom du tableau pour les fichiers
-	jsr CharGot
-	beq GetParams_end			; Fin de la ligne
-	cmp #','
-	bne GetParams_err			; Pas une ',' -> SyntaxError
-
-	jsr CharGet
-
-	lda #$40				; Tableau uniquement
-	sta $2b
-	jsr GetVarFromText
-	ldx $28
-	cpx #$ff				; Tableau de chaines?
-	bne GetParams_err
-	lda VARNAME1				; Sauvegarde le nom du tableau
-	sta VarTable
-	sta VarTable+6				; Et de l'indice (même nom que le tableau)
-	lda VARNAME2
-	sta VarTable+1
-	and #$7f
-	sta VarTable+7
-
-	; 3ième paramètre : nom du tableau pour les répertoires
-	jsr CharGot
-	beq GetParams_end			; Fin de la ligne
-	cmp #','
-	bne GetParams_err			; Pas une ',' -> SyntaxError
-
-	jsr CharGet
-
-	lda #$40
-	sta $2b
-	jsr GetVarFromText
-	ldx $28
-	cpx #$ff				; Tableau de chaines?
-	bne GetParams_err
-	lda VARNAME1				; Sauvegarde le nom du tableau
-	sta VarTable+2
-	sta VarTable+8				; Et de l'indice (même nom que le tableau)
-	lda VARNAME2
-	sta VarTable+3
-	and #$7f
-	sta VarTable+9
-
-  GetParams_end:
-	lda #$00				; Indique Ok
-	rts
-
-  GetParams_err:
-	lda #$ff
-	rts
-
-;----------------------------------------------------------------------
-;                      Met a jour un element d'un tableau
-;----------------------------------------------------------------------
-AddElt:
-;	lda ArrayName
-;	sta VARNAME1
-;	lda ArrayName+1
-;	sta VARNAME2
-	jsr SetVarName
-	clc					; On cherche un Tableau
-	jsr FindVarArray
-
-string:
-	ldy #$02				; Sauvegarde l'adresse de la chaine
-  loop2:
-  	lda (VAR_ADDR),y
-  	sta TMP_STR-1,y
-  	dey
-  	bne loop2
-  	lda (VAR_ADDR),y			; Taille de la chaine
-  	beq vide
-
-	lda VAR_ADDR				; Libère la chaine
-	ldy VAR_ADDR+1
-	jsr FreeStr+4
-
-  vide:
-	lda #11				; Longueur de la chaine
-	jsr NewStr				; ACC=Longueur / sortie: $A4-A5 = $A2-A3=XY=adresse de la chaine, ACC = longueur de la chaine
-	ldy #$00
-	sta (VAR_ADDR),y			; Nouvelle longueur dans le descripteur
-	iny
-	lda TMP_STR				; Nouvelle adresse de la chaine dans le descripteur
-	sta (VAR_ADDR),y
-	iny
-	lda TMP_STR+1
-	sta (VAR_ADDR),y
-	lda #11				; Longueur de la chaine
-
-  affectation:
-	ldx #<Buffer				; $06-07: Adresse de la chaine source
-	ldy #>Buffer
-	jsr CpyStr				; Copie une chaine, XY: adresse de la chaine, ACC: longueur de la chaine, $A4+A5: Destination
-	rts
-
-
-;----------------------------------------------------------------------
-;                  Recherche l'adresse d'une variable/tableau
-;----------------------------------------------------------------------
-FindVarArray:
-	bcs simple
-	lda #$00
-	sta VARFOUND				; Consultation
-	sta ARRAY_FLAG				; Atmos uniquement: on veut l'adresse d'un element et non celle du tableau
-	pha					; MSB indice du tableau (<255)
-	lda #$01				; Tableau à 1 dimension
-	sta LINESIZE
-	lda ArrayIndex,x			; LSB indice du tableau
-	pha
-	jmp FindArrayElt			; Adresse dans XY t $B6-B7: (XY) longueur de la chaine
-
-simple:
-	jmp FindVar				; Adresse dans XY t $B6-B7: (XY) longueur de la chaine
-
-
-;----------------------------------------------------------------------
-;                       Met a jour une variable
-;----------------------------------------------------------------------
-SetCH376Var:
-	jsr SetVarName
-	jmp SetVar
-
-;----------------------------------------------------------------------
-;                          Prepare le nom de la variable
-;----------------------------------------------------------------------
-SetVarName:
-	pha					; Sauvegarde A pour plus tard
-	txa
-	pha					; Sauvegarde X
-	asl
-	tax
-	lda VarTable,x
-	sta VARNAME1
-	inx
-	lda VarTable,x
-	sta VARNAME2
-	pla
-	tax					; Restaure X
-	pla					; Restaure A
-	;jmp SetVar
-	rts
-
-;----------------------------------------------------------------------
-;                         Met a jour une variable flotante
-;----------------------------------------------------------------------
-SetVar:
-	jsr GIVAYF				; Conversion Entier -> FACC1
-	jsr FindVar				; Recherche la variable (adresse en AY)
-	tax					; MOVMF nécessite que l'adresse soit en XY
-	jmp MOVMF
-
-
-;----------------------------------------------------------------------
-;				DATA
-;----------------------------------------------------------------------
-;.data
-DirName:
-	;.asciiz "/"
-	.asc "/"
-	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-
-DirFilter:
-	;.asciiz "*"
-	.asc "*", $00
-
-; Migré en page zéro pour pouvoir faire inc ArrayIndex,x
-;ArrayIndex:
-;	.byte $ff, $ff
-
-; FI et DI doivent être au début pour correspondre à leur index en page zéro
-VarTable:
-	.byte 'F','I'+$80
-	.byte 'D','I'+$80
-	.byte "ER","FI","DI"
-
-
-Buffer:
-	;.res 32
-	.dsb 32,0
-
-;----------------------------------------------------------------------
-;                         Fin du programme
-;----------------------------------------------------------------------
-
+	AND #$7F
+	STA 9+VARTABLE 
+										; END; 
+										; END; 
+ZZ0009
+										; .A = $00; 
+ZZ0008
+	LDA #$00
+										; RETURN; 
+	RTS 
+										; END; 
+										; GetParams_err: 
+ZZ0007
+	GetParams_err 
+										; .A = $FF; 
+	LDA #$FF
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; Met a jour un element d'un tableau 
+;---------------------------------------------------------------------------
+										;AddElt: 
+	AddElt 
+										; CALL SetVarName; 
+	JSR SetVarName 
+										; CLEAR .C; " On cherche un tableau"; 
+	CLC
+										; CALL FindVarArray; 
+	JSR FindVarArray 
+	;String:
+										; .Y = $02; " Sauvegarde l'adresse de la chaine"; 
+	LDY #$02
+										; REPEAT; 
+ZZ0010
+										; DO; 
+										; .A = @VAR_ADDR[.Y]; 
+	LDA (VAR_ADDR),Y
+										; 'STA TMP_STR-1,Y'; 
+	STA TMP_STR-1,Y
+										; DEC .Y; 
+	DEY
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0010 
+										; .A = @VAR_ADDR[.Y]; " Taille de la cahine"; 
+	LDA (VAR_ADDR),Y
+										; IFF .Z THEN Vide; 
+	BEQ Vide 
+										; .AY <- VAR_ADDR; " Libere la chaine"; 
+	LDA VAR_ADDR 
+	LDY VAR_ADDR+1
+										; CALL FreeStr_04; 
+	JSR FreeStr_04 
+										; Vide: 
+	Vide 
+										; .A = 11; " Longueur de la chaine"; 
+	LDA #11
+										; CALL NewStr; 
+	JSR NewStr 
+										; .Y = $00; 
+	LDY #$00
+										; 'STA (VAR_ADDR),Y'; " Nouvelle longueur dans le desripteur"; 
+	STA (VAR_ADDR),Y
+										; INC .Y; 
+	INY
+	; &VAR_ADDR[.Y] = TMP_STR;
+										; .A = TMP_STR; " Nouvelle adresse de la chaine dans le descripteur"; 
+	LDA TMP_STR 
+										; 'STA (VAR_ADDR), Y'; 
+	STA (VAR_ADDR), Y
+										; INC .Y; 
+	INY
+	; &VAR_ADDR[.Y] = TMP_STR_H;
+										; .A = TMP_STR_H; " Nouvelle adresse de la chaine dans le descripteur"; 
+	LDA TMP_STR_H 
+										; 'STA (VAR_ADDR), Y'; 
+	STA (VAR_ADDR), Y
+										; .A = 11; " Longueur de la chaine"; 
+	LDA #11
+										; .XY = ##BUFFER; 
+	LDX #<BUFFER 
+	LDY #>BUFFER 
+										; CALL CpyStr; " Copie une chaine, XY:adresse de la chaine, ACC: longueur de la 
+	JSR CpyStr 
+										; chaine, $A4-A5: Destination"; 
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; Recherche l'adresse d'une variable/tableau 
+;---------------------------------------------------------------------------
+										;FindVarArray: 
+	FindVarArray 
+										; IF ^.C THEN 
+	BCS ZZ0011 
+										; BEGIN; 
+										; VARFOUND = $00; " Consultation"; 
+	LDA #$00
+	STA VARFOUND 
+										; ARRAY_FLAG = .A; " Atmos uniquement:on veut l'adresse d'un element et non cel 
+	STA ARRAY_FLAG 
+										;le du tableau"; 
+										; STACK .A; " MSB indice du tableau (<255)"; 
+	PHA
+										; LINESIZE = $01; " Tableau a 1 dimension"; 
+	LDA #$01
+	STA LINESIZE 
+										; .A = ArrayIndex[.X]; " LSB indice du tableau"; 
+	LDA ArrayIndex,X
+										; STACK .A; 
+	PHA
+										; GOTO FindArrayElt; 
+	JMP FindArrayElt 
+										; END; 
+										; GOTO FindVar; 
+ZZ0011
+	JMP FindVar 
+;RETURN;
+;---------------------------------------------------------------------------
+; Met a jour une variable 
+;---------------------------------------------------------------------------
+										;SetCH376Var: 
+	SetCH376Var 
+										; CALL SetVarName; 
+	JSR SetVarName 
+										; GOTO SetVar; 
+	JMP SetVar 
+;RETURN
+;---------------------------------------------------------------------------
+; Prepare le nom de la variable 
+;---------------------------------------------------------------------------
+										;SetVarName: 
+	SetVarName 
+										; STACK .A, .X; " Sauvegarde A et X pour plus tard"; 
+	PHA
+	TXA
+	PHA
+										; SHIFT LEFT A; 
+	ASL
+										; .X = .A; 
+	TAX
+										; VARNAME1 = VARTABLE[.X]; 
+	LDA VARTABLE,X
+	STA VARNAME1 
+										; INC .X; 
+	INX
+										; VARNAME2 = VARTABLE[.X]; 
+	LDA VARTABLE,X
+	STA VARNAME2 
+										; UNSTACK .X, .A; " Restaure X & A"; 
+	PLA
+	TAX
+	PLA
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; Met a jour une variable flotante 
+;---------------------------------------------------------------------------
+										;SetVar: 
+	SetVar 
+										; CALL GIVAYF; " Conversion Entier -> FACC1"; 
+	JSR GIVAYF 
+										; CALL FindVar; " Recherche la variable (adresse en AY)"; 
+	JSR FindVar 
+										; .X = .A; 
+	TAX
+										; GOTO MOVMF; " MOVMF necessite que l'adresse soit en XY"; 
+	JMP MOVMF 
+;RETURN;
+;---------------------------------------------------------------------------
+; Fin du programme 
+;---------------------------------------------------------------------------
+										;'#include "lib/CH376.s"'; 
 #include "lib/CH376.s"
-
-END
+										;EXIT; 
+	END
