@@ -17,8 +17,8 @@
 	LINESIZE=$26
 										;DEFINE VARFOUND = $27; 
 	VARFOUND=$27
-										;DEFINE H28 = $28; 
-	H28=$28
+										;DEFINE VAR_TYPE = $28; 
+	VAR_TYPE=$28
 										;DEFINE ARRAY_FLAG = $2B; 
 	ARRAY_FLAG=$2B
 										;DEFINE TMP_STR = $A4; 
@@ -49,34 +49,38 @@
 ; Adresses des Routines ROM v1.0 
 ; 
 ;---------------------------------------------------------------------------
+										;'#if 0'; 
+#if 0
 										;DEFINE CharGet = $00E2; 
-;	CharGet=$00E2
+	CharGet=$00E2
 										;DEFINE CharGot = $00E8; 
-;	CharGot=$00E8
+	CharGot=$00E8
 										;DEFINE GetVarFromText = $D0FC; 
-;	GetVarFromText=$D0FC
+	GetVarFromText=$D0FC
 										;DEFINE FindVar = $D158; 
-;	FindVar=$D158
+	FindVar=$D158
 										;DEFINE FindArrayElt= $D270; 
-;	FindArrayElt=$D270
+	FindArrayElt=$D270
 										;DEFINE GIVAYF = $D3ED; 
-;	GIVAYF=$D3ED
+	GIVAYF=$D3ED
 										;DEFINE NewStr = $D563; 
-;	NewStr=$D563
+	NewStr=$D563
 										;DEFINE CpyStr = $D6F7; 
-;	CpyStr=$D6F7
+	CpyStr=$D6F7
 										;DEFINE FreeStr = $D715; 
-;	FreeStr=$D715
+	FreeStr=$D715
 										;DEFINE FreeStr_04 = FreeStr+4; 
-;	FreeStr_04=FreeStr+4
+	FreeStr_04=FreeStr+4
 										;DEFINE MOVMF = $DEA5; 
-;	MOVMF=$DEA5
-										;DEFINE EvalExpr = $CEBB; 
-;	EvalExpr=$CEBB
+	MOVMF=$DEA5
+										;DEFINE EvalExpr = $CE8B; 
+	EvalExpr=$CE8B
 										;DEFINE SyntaxError = $CFE4; 
-;	SyntaxError=$CFE4
+	SyntaxError=$CFE4
 										;DEFINE CheckStr = $D712; 
-;	CheckStr=$D712
+	CheckStr=$D712
+										;'#endif'; 
+#endif
 ;---------------------------------------------------------------------------
 ; 
 ; Adresses des Routines ROM v1.1 
@@ -163,8 +167,8 @@
 										;DATA 0; 
 	.BYT 0
 										;DECLARE BUFFER[32]; 
-	BUFFER
-.dsb 32,0
+	BUFFER  *=*+32
+;'.dsb 32,0';
 ;---------------------------------------------------------------------------
 ; 
 ; Debut du programme 
@@ -287,7 +291,7 @@ ZZ0002
 	; Recupere le repertoire
 										; CALL EvalExpr; 
 	JSR EvalExpr 
-										; CALL CheckStr; 
+										; CALL CheckStr; " XY = $91-92 = Adresse de la chaine, A=Longueur"; 
 	JSR CheckStr 
 										; IF ^.Z THEN 
 	BEQ ZZ0007 
@@ -303,31 +307,39 @@ ZZ0002
 	BNE GetParams_err 
 										; CALL CharGet; 
 	JSR CharGet 
+										; IFF .A = ',' THEN GetDirVar 
+	CMP #','
+	BEQ GetDirVar 
+										; ;BEGIN; 
 										; ARRAY_FLAG = $40; " Tableau uniquement"; 
 	LDA #$40
 	STA ARRAY_FLAG 
 										; CALL GetVarFromText; 
 	JSR GetVarFromText 
-										; .X = H28; 
-	LDX H28 
+										; .X = VAR_TYPE; 
+	LDX VAR_TYPE 
 										; IFF .X ^=$FF THEN GetParams_err; " Tableau de chaines?"; 
 	CPX #$FF
 	BNE GetParams_err 
+	; Optimisation: supprimer les LDA inutiles
 										; VARTABLE[0] = VARNAME1; " Sauvegarde le nom du tableau"; 
 	LDA VARNAME1 
 	STA 0+VARTABLE 
-										; VARTABLE[6] = VARNAME1; " et de l'indice"; 
+										; VARTABLE[4] = VARNAME1; " et de l'indice"; 
 	LDA VARNAME1 
-	STA 6+VARTABLE 
+	STA 4+VARTABLE 
 										; VARTABLE[1] = VARNAME2; 
 	LDA VARNAME2 
 	STA 1+VARTABLE 
-										; VARTABLE[7] = VARNAME2 .AND $7F; 
+										; VARTABLE[5] = VARNAME2 .AND $7F; 
 	LDA VARNAME2 
 ;
 	AND #$7F
-	STA 7+VARTABLE 
+	STA 5+VARTABLE 
+										; ;END; 
 	; 3ieme parametre : nom du tableau pour les repertoires
+										; GetDirVar: 
+	GetDirVar 
 										; CALL CharGot; 
 	JSR CharGot 
 										; IF ^.Z THEN 
@@ -338,30 +350,70 @@ ZZ0002
 	BNE GetParams_err 
 										; CALL CharGet; 
 	JSR CharGet 
+										; IFF .A = ',' THEN GetErrVar; 
+	CMP #','
+	BEQ GetErrVar 
+										; ;BEGIN; 
 										; ARRAY_FLAG = $40; " Tableau uniquement"; 
 	LDA #$40
 	STA ARRAY_FLAG 
 										; CALL GetVarFromText; 
 	JSR GetVarFromText 
-										; .X = H28; 
-	LDX H28 
+										; .X = VAR_TYPE; 
+	LDX VAR_TYPE 
 										; IFF .X ^=$FF THEN GetParams_err; " Tableau de chaines?"; 
 	CPX #$FF
 	BNE GetParams_err 
+	; Optimisation: supprimer les LDA inutiles
 										; VARTABLE[2] = VARNAME1; " Sauvegarde le nom du tableau"; 
 	LDA VARNAME1 
 	STA 2+VARTABLE 
-										; VARTABLE[8] = VARNAME1; " et de l'indice"; 
+										; VARTABLE[6] = VARNAME1; " et de l'indice"; 
 	LDA VARNAME1 
-	STA 8+VARTABLE 
+	STA 6+VARTABLE 
 										; VARTABLE[3] = VARNAME2; 
 	LDA VARNAME2 
 	STA 3+VARTABLE 
-										; VARTABLE[9] = VARNAME2 .AND $7F; 
+										; VARTABLE[7] = VARNAME2 .AND $7F; 
 	LDA VARNAME2 
 ;
 	AND #$7F
+	STA 7+VARTABLE 
+										; ;END; 
+	; 4ieme parametre : variable pour les erreurs CH376
+										; GetErrVar: 
+	GetErrVar 
+										; '#if 0'; 
+#if 0
+										; CALL CharGot; 
+	JSR CharGot 
+										; IF ^.Z THEN 
+	BEQ ZZ0010 
+										; BEGIN; 
+										; IFF .A ^= ',' THEN GetParams_err; 
+	CMP #','
+	BNE GetParams_err 
+										; CALL CharGet; 
+	JSR CharGet 
+										; ARRAY_FLAG = $80; " Pas de tableau ni de variable entiere"; 
+	LDA #$80
+	STA ARRAY_FLAG 
+										; CALL GetVarFromText; 
+	JSR GetVarFromText 
+										; .X = VAR_TYPE; 
+	LDX VAR_TYPE 
+										; IFF ^ .Z THEN GetParams_err; " Variable numerique?"; 
+	BNE GetParams_err 
+										; VARTABLE[8] = VARNAME1; " Sauvegarde le nom de la variable"; 
+	LDA VARNAME1 
+	STA 8+VARTABLE 
+										; VARTABLE[9] = VARNAME2; 
+	LDA VARNAME2 
 	STA 9+VARTABLE 
+										; END; 
+										; '#endif'; 
+ZZ0010
+#endif
 										; END; 
 										; END; 
 ZZ0009
@@ -393,7 +445,7 @@ ZZ0007
 										; .Y = $02; " Sauvegarde l'adresse de la chaine"; 
 	LDY #$02
 										; REPEAT; 
-ZZ0010
+ZZ0011
 										; DO; 
 										; .A = @VAR_ADDR[.Y]; 
 	LDA (VAR_ADDR),Y
@@ -403,7 +455,7 @@ ZZ0010
 	DEY
 										; END; 
 										; UNTIL .Z; 
-	BNE ZZ0010 
+	BNE ZZ0011 
 										; .A = @VAR_ADDR[.Y]; " Taille de la cahine"; 
 	LDA (VAR_ADDR),Y
 										; IFF .Z THEN Vide; 
@@ -453,7 +505,7 @@ ZZ0010
 										;FindVarArray: 
 	FindVarArray 
 										; IF ^.C THEN 
-	BCS ZZ0011 
+	BCS ZZ0012 
 										; BEGIN; 
 										; VARFOUND = $00; " Consultation"; 
 	LDA #$00
@@ -474,7 +526,7 @@ ZZ0010
 	JMP FindArrayElt 
 										; END; 
 										; GOTO FindVar; 
-ZZ0011
+ZZ0012
 	JMP FindVar 
 ;RETURN;
 ;---------------------------------------------------------------------------

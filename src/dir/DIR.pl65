@@ -257,8 +257,8 @@ GetParams:
 				;END;
 
 				" 4ieme parametre : variable pour les erreurs CH376";
-				'#if 0';
 				GetErrVar:
+				'#if 0';
 				CALL CharGot;
 				IF ^.Z THEN
 				BEGIN;
