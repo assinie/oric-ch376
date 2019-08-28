@@ -13,7 +13,7 @@ DECLARE R1 ;
 
 DEFINE LINESIZE   = $26;			" Trouver un autre label";
 DEFINE VARFOUND   = $27;
-DEFINE H28        = $28;
+DEFINE VAR_TYPE   = $28;
 DEFINE ARRAY_FLAG = $2B;
 
 DEFINE TMP_STR    = $A4;
@@ -40,6 +40,7 @@ DECLARE ArrayIndex[2];
 "                   Adresses des Routines ROM v1.0                          ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
+'#if 0';
 DEFINE CharGet     = $00E2;
 DEFINE CharGot     = $00E8;
 DEFINE GetVarFromText = $D0FC;
@@ -53,10 +54,10 @@ DEFINE FreeStr     = $D715;
 DEFINE FreeStr_04  = FreeStr+4;
 DEFINE MOVMF       = $DEA5;
 
-DEFINE EvalExpr    = $CEBB;
+DEFINE EvalExpr    = $CE8B;
 DEFINE SyntaxError = $CFE4;
 DEFINE CheckStr    = $D712;
-
+'#endif';
 "---------------------------------------------------------------------------";
 "                                                                           ";
 "                   Adresses des Routines ROM v1.1                          ";
@@ -205,7 +206,7 @@ RETURN;
 GetParams:
 	" Recupere le repertoire";
 	CALL EvalExpr;
-	CALL CheckStr;
+	CALL CheckStr;								" XY = $91-92 = Adresse de la chaine, A=Longueur";
 	IF ^.Z THEN
 	BEGIN;
 		" 2ieme parametre : nom du tableau pour les fichiers";
@@ -216,18 +217,23 @@ GetParams:
 
 			CALL CharGet;
 
-			ARRAY_FLAG = $40;					" Tableau uniquement";
-			CALL GetVarFromText;
+			IFF .A = ',' THEN GetDirVar
+			;BEGIN;
+				ARRAY_FLAG = $40;				" Tableau uniquement";
+				CALL GetVarFromText;
 
-			.X = H28;
-			IFF .X ^=$FF THEN GetParams_err;			" Tableau de chaines?";
+				.X = VAR_TYPE;
+				IFF .X ^=$FF THEN GetParams_err;		" Tableau de chaines?";
 
-			VARTABLE[0] = VARNAME1;					" Sauvegarde le nom du tableau";
-			VARTABLE[6] = VARNAME1;					" et de l'indice";
-			VARTABLE[1] = VARNAME2;
-			VARTABLE[7] = VARNAME2 .AND $7F;
+				" Optimisation: supprimer les LDA inutiles";
+				VARTABLE[0] = VARNAME1;				" Sauvegarde le nom du tableau";
+				VARTABLE[4] = VARNAME1;				" et de l'indice";
+				VARTABLE[1] = VARNAME2;
+				VARTABLE[5] = VARNAME2 .AND $7F;
+			;END;
 
 			" 3ieme parametre : nom du tableau pour les repertoires";
+			GetDirVar:
 			CALL CharGot;
 			IF ^.Z THEN
 			BEGIN;
@@ -235,16 +241,41 @@ GetParams:
 
 				CALL CharGet;
 
-				ARRAY_FLAG = $40;				" Tableau uniquement";
-				CALL GetVarFromText;
+				IFF .A = ',' THEN GetErrVar;
+				;BEGIN;
+					ARRAY_FLAG = $40;			" Tableau uniquement";
+					CALL GetVarFromText;
 
-				.X = H28;
-				IFF .X ^=$FF THEN GetParams_err;		" Tableau de chaines?";
+					.X = VAR_TYPE;
+					IFF .X ^=$FF THEN GetParams_err;	" Tableau de chaines?";
 
-				VARTABLE[2] = VARNAME1;				" Sauvegarde le nom du tableau";
-				VARTABLE[8] = VARNAME1;				" et de l'indice";
-				VARTABLE[3] = VARNAME2;
-				VARTABLE[9] = VARNAME2 .AND $7F;
+					" Optimisation: supprimer les LDA inutiles";
+					VARTABLE[2] = VARNAME1;			" Sauvegarde le nom du tableau";
+					VARTABLE[6] = VARNAME1;			" et de l'indice";
+					VARTABLE[3] = VARNAME2;
+					VARTABLE[7] = VARNAME2 .AND $7F;
+				;END;
+
+				" 4ieme parametre : variable pour les erreurs CH376";
+				'#if 0';
+				GetErrVar:
+				CALL CharGot;
+				IF ^.Z THEN
+				BEGIN;
+					IFF .A ^= ',' THEN GetParams_err;
+
+					CALL CharGet;
+
+					ARRAY_FLAG = $80;				" Pas de tableau ni de variable entiere";
+					CALL GetVarFromText;
+
+					.X = VAR_TYPE;
+					IFF ^ .Z THEN GetParams_err;		" Variable numerique?";
+
+					VARTABLE[8] = VARNAME1;				" Sauvegarde le nom de la variable";
+					VARTABLE[9] = VARNAME2;
+				END;
+				'#endif';
 			END;
 		END;
 
