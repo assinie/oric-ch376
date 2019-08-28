@@ -1,0 +1,270 @@
+										;'#include <include/CH376.h>'; 
+#include <include/CH376.h>
+;---------------------------------------------------------------------------
+; 
+; Variables en page 0 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $0A; 
+	*=$0A
+										;DECLARE R0 WORD; 
+	R0  *=*+2
+										;DECLARE R1 ; 
+	R1  *=*+1
+										;DEFINE H91 = $91; 
+	H91=$91
+										;DEFINE VARNAME1 = $B4; 
+	VARNAME1=$B4
+										;DEFINE VARNAME2 = $B5; 
+	VARNAME2=$B5
+										;DEFINE VAR_ADDR = $B6; 
+	VAR_ADDR=$B6
+										;DEFINE * = $F7; 
+	*=$F7
+										;DECLARE LEN; 
+	LEN  *=*+1
+;DECLARE OFFSET;"; " / \ Offset est declare dans CH376.h
+;---------------------------------------------------------------------------
+; 
+; Variables en page 2 
+; 
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+; 
+; Adresses des Routines ROM v1.0 
+; 
+;---------------------------------------------------------------------------
+										;'#if 0'; 
+#if 0
+										;DEFINE FindVar = $D158; 
+	FindVar=$D158
+										;DEFINE GIVAYF = $D3ED; 
+	GIVAYF=$D3ED
+										;DEFINE MOVMF = $DEA5; 
+	MOVMF=$DEA5
+										;DEFINE EvalExpr = $CE8B; 
+	EvalExpr=$CE8B
+										;DEFINE SyntaxError = $CFE4; 
+	SyntaxError=$CFE4
+										;DEFINE CheckStr = $D712; 
+	CheckStr=$D712
+										;'#endif'; 
+#endif
+;---------------------------------------------------------------------------
+; 
+; Adresses des Routines ROM v1.1 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE FindVar = $D1E8; 
+	FindVar=$D1E8
+										;DEFINE GIVAYF = $D499; 
+	GIVAYF=$D499
+										;DEFINE MOVMF = $DEAD; 
+	MOVMF=$DEAD
+										;DEFINE EvalExpr = $CF17; 
+	EvalExpr=$CF17
+										;DEFINE SyntaxError = $D070; 
+	SyntaxError=$D070
+										;DEFINE CheckStr = $D7CD; 
+	CheckStr=$D7CD
+;---------------------------------------------------------------------------
+; 
+; Adresses des Buffers ou Tables 
+; 
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+; 
+; Defines 
+; 
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+; 
+; En-tete fichier .tap 
+; 
+;---------------------------------------------------------------------------
+										;'AUTOEXEC = 0'; 
+	AUTOEXEC= 0
+										;' .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC'; 
+	 .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
+										;' .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-CD", $00'; 
+	 .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-CD", $00
+;---------------------------------------------------------------------------
+; 
+; Variables et buffers 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $9600-2; 
+	*=$9600-2
+										;DATAW cd; 
+	.WORD cd 
+										;DECLARE ER CHARACTER['ER']; 
+	ER .BYT 'ER'
+;---------------------------------------------------------------------------
+; 
+; Debut du programme 
+; 
+;---------------------------------------------------------------------------
+										;cd: 
+	cd 
+										; CALL EvalExpr; 
+	JSR EvalExpr 
+										; CALL CheckStr; " XY = $91-92 = Adresse de la chaine, A = Longueur"; 
+	JSR CheckStr 
+										; IF ^.Z THEN CALL _cd; 
+	BEQ ZZ0001 
+	JSR _cd 
+	; Code erreur -> FACC1
+ZZ0001
+										; CALL GIVAYF; 
+	JSR GIVAYF 
+	; Cherche la variable ER
+										; VARNAME1 = ER[0]; 
+	LDA 0+ER 
+	STA VARNAME1 
+										; VARNAME2 = ER[1]; 
+	LDA 1+ER 
+	STA VARNAME2 
+										; CALL FindVar; 
+	JSR FindVar 
+	; Change sa valeur
+										; .X = .A; 
+	TAX
+										; CALL MOVMF; 
+	JSR MOVMF 
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; 
+; Routine principale 
+; 
+;---------------------------------------------------------------------------
+; Entree: 
+; $91-92: Adresse de la chaine 
+; A : Longueur de la chaine 
+; 
+; Sortie: 
+; AY: Code erreur CH376 ($41 si Ok) 
+;---------------------------------------------------------------------------
+										;_cd: 
+	_cd 
+										; LEN = .A; " Sauvegarde la longueur de la chaine"; 
+	STA LEN 
+										; OFFSET = 0; 
+	LDA #0
+	STA OFFSET 
+	; Note: InitCH376 fait un Mount USB qui replace le rpertoire par
+	; defaut a '/'
+	; A modifier pour autoriser un repertoire relatif
+										; CALL InitCH376; 
+	JSR InitCH376 
+										; IF .Z THEN 
+	BNE ZZ0002 
+										; BEGIN; 
+	; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
+										; IF &H91 = '/' THEN 
+	LDY #0
+	LDA #'/'
+	CMP (H91),Y
+	BEQ  *+5
+	JMP ZZ0003 
+										; BEGIN; 
+	; Apres le test, .A contient '/' soit $2F
+										; CH376_COMMAND = .A; " SetFilename"; 
+	STA CH376_COMMAND 
+										; CH376_DATA = .A; 
+	STA CH376_DATA 
+										; CH376_DATA = $00; 
+	LDA #$00
+	STA CH376_DATA 
+										; CALL FileOpen; " Detruit X et Y"; 
+	JSR FileOpen 
+										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End; 
+	CMP #ERR_OPEN_DIR 
+	BNE CD_End 
+										; INC OFFSET; 
+	INC OFFSET 
+										; END; 
+										; IF OFFSET < LEN THEN CH376_COMMAND = $2F; " SetFilename"; 
+ZZ0003
+	LDA LEN 
+	CMP OFFSET 
+	BEQ  *+4
+	BCS  *+5
+	JMP ZZ0004 
+	LDA #$2F
+	STA CH376_COMMAND 
+ZZ0004
+	; Remplacer BCC *+5/JMP ZZnnnnn par BCS ZZnnnnn
+										; WHILE OFFSET < LEN 
+ZZ0005 LDA OFFSET
+	CMP LEN 
+	BCC  *+5
+	JMP ZZ0006 
+										; DO; 
+	; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
+	; IF &H91[OFFSET] = '/' THEN
+										; .Y = OFFSET; 
+	LDY OFFSET 
+										; .A = @H91[.Y]; 
+	LDA (H91),Y
+	; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
+										; IF .A = '/' THEN 
+	CMP #'/'
+	BEQ  *+5
+	JMP ZZ0007 
+										; BEGIN; 
+										; CH376_DATA = 0; 
+	LDA #0
+	STA CH376_DATA 
+										; CALL FileOpen; 
+	JSR FileOpen 
+										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End; 
+	CMP #ERR_OPEN_DIR 
+	BNE CD_End 
+										; INC OFFSET; 
+	INC OFFSET 
+										; IF OFFSET < LEN THEN CH376_COMMAND = $2F; " SetFilename"; 
+	LDA LEN 
+	CMP OFFSET 
+	BEQ  *+4
+	BCS  *+5
+	JMP ZZ0008 
+	LDA #$2F
+	STA CH376_COMMAND 
+ZZ0008
+										; .Y = OFFSET; 
+	LDY OFFSET 
+										; .A = @H91[.Y]; 
+	LDA (H91),Y
+										; END; 
+										; CH376_DATA = .A; 
+ZZ0007
+	STA CH376_DATA 
+										; INC OFFSET; 
+	INC OFFSET 
+										; END; 
+	JMP ZZ0005 
+ZZ0006
+										; CH376_DATA = $00; 
+	LDA #$00
+	STA CH376_DATA 
+										; CALL FileOpen; 
+	JSR FileOpen 
+										; CD_End: 
+	CD_End 
+										; END; 
+	; .AY = Code erreur, poids faible dans .A
+ZZ0002
+										; .Y = .A; 
+	TAY
+										; CLEAR .A; 
+	LDA #0
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; Fin du programme 
+;---------------------------------------------------------------------------
+										;'#include "lib/CH376.s"'; 
+#include "lib/CH376.s"
+										;EXIT; 
+	END
