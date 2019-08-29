@@ -7,4 +7,4 @@
 | help  | simule la commande !HELP de FT-DOS   |
 | include  |  |
 | lib   | librairie pour le C376   |
-
+| rs    | simule la commande !RS du FTDOS |

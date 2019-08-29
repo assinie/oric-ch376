@@ -8,3 +8,4 @@
 | include  |  |
 | lib   | librairie pour le C376   |
 | load-ovl | permet de charger un fichier ROM en RAM overlay |
+| rs    | simule la commande !RS du FTDOS |
