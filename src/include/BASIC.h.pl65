@@ -1,0 +1,89 @@
+'#ifndef BASIC_H';
+
+'#define BASIC_H';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 0                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE LINESIZE   = $26;			" Trouver un autre label";
+DEFINE VARFOUND   = $27;
+DEFINE VAR_TYPE   = $28;
+DEFINE ARRAY_FLAG = $2B;
+
+DEFINE TMP_STR    = $A4;
+	DEFINE TMP_STR_H = $A5;
+
+DEFINE H91        = $91;
+
+DEFINE VARNAME1   = $B4;
+DEFINE VARNAME2   = $B5;
+DEFINE VAR_ADDR   = $B6;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Routines ROM v1.0                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+'#ifdef ORIC1';
+DEFINE CharGet     = $00E2;
+DEFINE CharGot     = $00E8;
+DEFINE GetVarFromText = $D0FC;
+
+DEFINE FindVar     = $D158;
+DEFINE FindArrayElt= $D270;
+DEFINE GIVAYF      = $D3ED;
+DEFINE NewStr      = $D563;
+DEFINE CpyStr      = $D6F7;
+DEFINE FreeStr     = $D715;
+DEFINE FreeStr_04  = FreeStr+4;
+DEFINE MOVMF       = $DEA5;
+
+DEFINE EvalExpr    = $CE8B;
+DEFINE SyntaxError = $CFE4;
+DEFINE CheckStr    = $D712;
+
+DEFINE PrintString = $CBED;
+DEFINE PrintString_07 = PrintString+7;
+
+" $F7AC";
+DEFINE PrintA      = $CC12;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Routines ROM v1.1                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+'#else';
+DEFINE CharGet     = $00E2;
+DEFINE CharGot     = $00E8;
+DEFINE GetVarFromText = $D188;
+
+DEFINE FindVar     = $D1E8;
+DEFINE FindArrayElt= $D306;
+DEFINE GIVAYF      = $D499;
+DEFINE NewStr      = $D61E;
+DEFINE CpyStr      = $D7B2;
+DEFINE FreeStr     = $D7D0;
+DEFINE FreeStr_04  = FreeStr+4;
+DEFINE MOVMF       = $DEAD;
+
+DEFINE EvalExpr    = $CF17;
+DEFINE SyntaxError = $D070;
+DEFINE CheckStr    = $D7CD;
+
+DEFINE PrintString = $CCB0;
+DEFINE PrintString_07 = PrintString+7;
+
+" $F7E4";
+DEFINE PrintA      = $CCD9;
+
+'#endif';
+
+"---------------------------------------------------------------------------";
+'#endif';
+
+"---------------------------------------------------------------------------";
+EXIT;
+
