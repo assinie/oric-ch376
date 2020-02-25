@@ -1,0 +1,189 @@
+'#include <include/CH376.h>';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 0                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE * = $0A;
+DECLARE R0 WORD;
+DECLARE R1 ;
+
+DEFINE H91 = $91;
+
+DEFINE VARNAME1   = $B4;
+DEFINE VARNAME2   = $B5;
+DEFINE VAR_ADDR   = $B6;
+
+DEFINE * = $F7;
+DECLARE LEN;
+"DECLARE OFFSET;";								" /!\ Offset est déclaré dans CH376.h";
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 2                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Routines ROM v1.0                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+'#if 0';
+DEFINE FindVar     = $D158;
+DEFINE GIVAYF      = $D3ED;
+DEFINE MOVMF       = $DEA5;
+
+DEFINE EvalExpr    = $CE8B;
+DEFINE SyntaxError = $CFE4;
+DEFINE CheckStr    = $D712;
+'#endif';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Routines ROM v1.1                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE FindVar     = $D1E8;
+DEFINE GIVAYF      = $D499;
+DEFINE MOVMF       = $DEAD;
+
+DEFINE EvalExpr    = $CF17;
+DEFINE SyntaxError = $D070;
+DEFINE CheckStr    = $D7CD;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Buffers ou Tables                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                            Defines                                        ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       En-tete fichier .tap                                ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+'AUTOEXEC = 0';
+'        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
+'        .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-CD", $00';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                         Variables et buffers                              ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE * = $9600-2;
+DATAW cd;
+
+DECLARE ER CHARACTER['ER'];
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                        Debut du programme                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+cd:
+	CALL EvalExpr;
+	CALL CheckStr;								" XY = $91-92 = Adresse de la chaine, A = Longueur";
+
+	IF ^.Z THEN CALL _cd;
+
+	" Code erreur -> FACC1";
+	CALL GIVAYF;
+
+	" Cherche la variable ER";
+	VARNAME1 = ER[0];
+	VARNAME2 = ER[1];
+	CALL FindVar;
+
+	" Change sa valeur";
+	.X = .A;
+	CALL MOVMF;
+RETURN;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                        Routine principale                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+" Entree:                                                                   ";
+"        $91-92: Adresse de la chaine                                       ";
+"        A     : Longueur de la chaine                                      ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"        AY: Code erreur CH376  ($41 si Ok)                                 ";
+"---------------------------------------------------------------------------";
+_cd:
+	LEN = .A;								" Sauvegarde la longueur de la chaine";
+	OFFSET = 0;
+
+	" Note: InitCH376 fait un Mount USB qui replace le rpertoire par";
+	"       defaut a '/'";
+	"       A modifier pour autoriser un repertoire relatif";
+	CALL InitCH376;
+	IF .Z THEN
+	BEGIN;
+		" Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn";
+		IF &H91 = '/' THEN
+		BEGIN;
+			" Apres le test, .A contient '/' soit $2F";
+			CH376_COMMAND = .A;						" SetFilename";
+			CH376_DATA = .A;
+			CH376_DATA = $00;
+			CALL FileOpen;							" Detruit X et Y";
+			IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
+			INC OFFSET;
+		END;
+
+		IF OFFSET < LEN THEN CH376_COMMAND = $2F;				" SetFilename";
+
+		" Remplacer BCC *+5/JMP ZZnnnnn par BCS ZZnnnnn";
+		WHILE OFFSET < LEN
+		DO;
+			" Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn";
+			" IF &H91[OFFSET] = '/' THEN";
+			.Y = OFFSET;
+			.A = @H91[.Y];
+			" Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn";
+			IF .A = '/' THEN
+			BEGIN;
+				CH376_DATA = 0;
+				CALL FileOpen;
+				IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
+
+				INC OFFSET;
+				IF OFFSET < LEN THEN CH376_COMMAND = $2F;		" SetFilename";
+				.Y = OFFSET;
+				.A = @H91[.Y];
+
+			END;
+
+			CH376_DATA = .A;
+			INC OFFSET;
+		END;
+
+		CH376_DATA = $00;
+		CALL FileOpen;
+	CD_End:
+	END;
+
+	" .AY = Code erreur, poids faible dans .Y";
+	.Y = .A;
+	CLEAR .A;
+RETURN;
+
+"---------------------------------------------------------------------------";
+"                          Fin du programme                                 ";
+"---------------------------------------------------------------------------";
+'#include "lib/CH376.s"';
+
+EXIT;
+
