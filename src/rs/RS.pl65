@@ -125,7 +125,7 @@ DEFINE CheckStr    = $D7CD;
 "---------------------------------------------------------------------------";
 'AUTOEXEC = 0';
 '        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
-'        .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-RS", $00';
+'        .db >END, <END, >($9700-2), <($9700-2), $0B, "CH376-RS", $00';
 
 "---------------------------------------------------------------------------";
 "                                                                           ";
@@ -134,8 +134,8 @@ DEFINE CheckStr    = $D7CD;
 "---------------------------------------------------------------------------";
 DEFINE TrackSize = 6400;
 
-DEFINE * = $9600-2;
-DATAW ReadTrack;
+DEFINE * = $9700-2;
+DATAW ReadSector;
 
 DECLARE BUFFER[256];
 "'.dsb 256,0';";
@@ -152,11 +152,11 @@ DATA 0;
 "                        Debut du programme                                 ";
 "                                                                           ";
 "---------------------------------------------------------------------------";
-ReadTrack:
+ReadSector:
 	CALL EvalExpr;
 	CALL CheckStr;								" XY = $91-92 = Adresse de la chaine, A = Longueur";
 
-	IF ^.Z THEN CALL _ReadTrack;
+	IF ^.Z THEN CALL _ReadSector;
 
 	" Code erreur -> FACC1";
 	CALL GIVAYF;
@@ -191,7 +191,7 @@ RETURN;
 " Sortie:                                                                   ";
 "        AY: Code erreur CH376  ($14 si Ok)                                 ";
 "---------------------------------------------------------------------------";
-_ReadTrack:
+_ReadSector:
 	LEN = .A;
 	CALL InitCH376;
 	IFF ^.Z THEN Error;

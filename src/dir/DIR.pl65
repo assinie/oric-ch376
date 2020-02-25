@@ -304,7 +304,7 @@ AddElt:
 	END;
 	UNTIL .Z;
 
-	.A = @VAR_ADDR[.Y];		" Taille de la cahine";
+	.A = @VAR_ADDR[.Y];		" Taille de la chaine";
 	IFF .Z THEN Vide;
 
 	.AY <- VAR_ADDR;		" Libère la chaine";

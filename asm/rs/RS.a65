@@ -165,8 +165,8 @@ ZP_PTR=PTW
 	AUTOEXEC= 0
 										;' .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC'; 
 	 .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
-										;' .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-RS", $00'; 
-	 .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-RS", $00
+										;' .db >END, <END, >($9700-2), <($9700-2), $0B, "CH376-RS", $00'; 
+	 .db >END, <END, >($9700-2), <($9700-2), $0B, "CH376-RS", $00
 ;---------------------------------------------------------------------------
 ; 
 ; Variables et buffers 
@@ -174,13 +174,13 @@ ZP_PTR=PTW
 ;---------------------------------------------------------------------------
 										;DEFINE TrackSize = 6400; 
 	TrackSize=6400
-										;DEFINE * = $9600-2; 
-	*=$9600-2
-										;DATAW ReadTrack; 
-	.WORD ReadTrack 
+										;DEFINE * = $9700-2;
+	*=$9700-2
+										;DATAW ReadSector;
+	.WORD ReadSector
 										;DECLARE BUFFER[256]; 
-	BUFFER
-.dsb 256,0
+	BUFFER  .dsb 256,0
+;'.dsb 256,0';
 										;DECLARE ER CHARACTER['ER']; 
 	ER .BYT 'ER'
 										;DECLARE LEN BYTE INITIAL[0]; 
@@ -194,15 +194,15 @@ ZP_PTR=PTW
 ; Debut du programme 
 ; 
 ;---------------------------------------------------------------------------
-										;ReadTrack: 
-	ReadTrack 
+										;ReadSector:
+	ReadSector
 										; CALL EvalExpr; 
 	JSR EvalExpr 
 										; CALL CheckStr; " XY = $91-92 = Adresse de la chaine, A = Longueur"; 
 	JSR CheckStr 
-										; IF ^.Z THEN CALL _ReadTrack; 
+										; IF ^.Z THEN CALL _ReadSector;
 	BEQ ZZ0001 
-	JSR _ReadTrack 
+	JSR _ReadSector
 	; Code erreur -> FACC1
 ZZ0001
 										; CALL GIVAYF; 
@@ -246,8 +246,8 @@ ZZ0001
 ; Sortie: 
 ; AY: Code erreur CH376 ($14 si Ok) 
 ;---------------------------------------------------------------------------
-										;_ReadTrack: 
-	_ReadTrack 
+										;_ReadSector:
+	_ReadSector
 										; LEN = .A; 
 	STA LEN 
 										; CALL InitCH376; 

@@ -19,9 +19,9 @@ DOKE #2F5,DEEK(#95FE)
 ```
 
 ### Notes:
-- Les tableaux doivent être correctement dimensionés avant l'appel sinon une erreur BASIC sera renvoyée.
+- Les tableaux doivent être correctement dimensionnés avant l'appel sinon une erreur BASIC sera renvoyée.
 - Si les tableaux ne sont pas indiqués, la commande reprend les tableaux précédents (FI$ et DI$ par défaut).
 - Le nom du répertoire doit commencer par un **/** pour indiquer la racine de la clé USB.
 - On peut indiquer un sous-répertoire `!"/REP"`.
-- Le répertoire puet être contenu dans une variable `A$="/": !A$`
+- Le répertoire peut être contenu dans une variable `A$="/": !A$`
 

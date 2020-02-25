@@ -167,7 +167,7 @@
 										;DATA 0; 
 	.BYT 0
 										;DECLARE BUFFER[32]; 
-	BUFFER  *=*+32
+	BUFFER  .dsb 32,0
 ;'.dsb 32,0';
 ;---------------------------------------------------------------------------
 ; 
@@ -456,7 +456,7 @@ ZZ0011
 										; END; 
 										; UNTIL .Z; 
 	BNE ZZ0011 
-										; .A = @VAR_ADDR[.Y]; " Taille de la cahine"; 
+										; .A = @VAR_ADDR[.Y]; " Taille de la chaine";
 	LDA (VAR_ADDR),Y
 										; IFF .Z THEN Vide; 
 	BEQ Vide 
