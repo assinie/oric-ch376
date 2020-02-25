@@ -1,0 +1,1133 @@
+										;'#define WOR word'; 
+#define WOR word
+										;'#include <include/CH376.h>'; 
+#include <include/CH376.h>
+										;'#include <include/BASIC.h>'; 
+#include <include/BASIC.h>
+;---------------------------------------------------------------------------
+; 
+; Variables en page 0 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE * = $0A; 
+	*=$0A
+										;DECLARE R0 WORD; 
+	R0  *=*+2
+										;DECLARE R1 ; 
+	R1  *=*+1
+; Re-utilise l'emplacement de OFFSET_xxx
+										;DEFINE * = $05; 
+	*=$05
+										;DECLARE Track ; 
+	Track  *=*+1
+										;DECLARE Head ; 
+	Head  *=*+1
+										;DECLARE Sector ; 
+	Sector  *=*+1
+										;DECLARE Size ; 
+	Size  *=*+1
+; Deplace dans le programme
+;DEFINE * = $F7;
+;DECLARE ArrayIndex[2];
+; DEFINE ArrayIndex_FI = ArrayIndex;
+; DEFINE ArrayIndex_DI = ArrayIndex+1;
+										;DEFINE * = $F7; 
+	*=$F7
+										;DECLARE CRC WORD; 
+	CRC  *=*+2
+										; DEFINE CRC_L = CRC; 
+	CRC_L=CRC 
+										; DEFINE CRC_H = CRC_L+1; 
+	CRC_H=CRC_L+1
+; / \ ATTENTION
+; Re-utilise l'emplacement de PTW ($F5)
+										;DEFINE ZP_PTR = PTW; 
+ZP_PTR=PTW 
+;---------------------------------------------------------------------------
+; 
+; Variables en page 2 
+; 
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+; 
+; Variables en page 4 
+; 
+;---------------------------------------------------------------------------
+; Variables FTDOS 
+;---------------------------------------------------------------------------
+										;DEFINE * = $048C; 
+	*=$048C
+										;DECLARE NLU; 
+	NLU  *=*+1
+										;DECLARE NP ; 
+	NP  *=*+1
+										;DECLARE NS ; 
+	NS  *=*+1
+										;DECLARE BUFFER_PTR WORD; 
+	BUFFER_PTR  *=*+2
+;---------------------------------------------------------------------------
+; 
+; Adresses des Buffers ou Tables 
+; 
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+; 
+; Defines 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE TrackSize = 6400; 
+	TrackSize=6400
+;---------------------------------------------------------------------------
+; 
+; En-tete fichier .tap 
+; 
+;---------------------------------------------------------------------------
+										;'AUTOEXEC = 0'; 
+	AUTOEXEC= 0
+										;' .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC'; 
+	 .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
+										;' .db >END, <END, >($9600-2), <($9600-2), $0C, "CH376-CATDIR", $00'; 
+	 .db >END, <END, >($9600-2), <($9600-2), $0C, "CH376-CATDIR", $00
+;---------------------------------------------------------------------------
+; 
+; Variables et buffers 
+; 
+;---------------------------------------------------------------------------
+										;DEFINE I = R0; 
+	I=R0 
+										;DEFINE * = $9600-2; 
+	*=$9600-2
+										;DATAW CATDIR; 
+	.WORD CATDIR 
+										;DECLARE BUFFER[256]; 
+	BUFFER  .dsb 256,0
+;'.dsb 256,0';
+										;DECLARE BUFFER2[256]; 
+	BUFFER2  .dsb 256,0
+;'.dsb 256,0';
+										;VARTABLE: 
+	VARTABLE 
+	; Arrays
+										; STRING 'FI'; 
+	.BYT 'F',$C9
+	; Strings
+										; STRING 'OS'; 
+	.BYT 'O',$D3
+	; Float vars
+										; DECLARE FI CHARACTER['FI']; 
+	FI .BYT 'FI'
+										; DECLARE DI CHARACTER['DI']; 
+	DI .BYT 'DI'
+										; DECLARE ER CHARACTER['ER']; 
+	ER .BYT 'ER'
+; Deplace ici car $F7-F8 est utilise pour la lecture de fichier
+;DECLARE ArrayIndex[2];
+;'.dsb 2,0';
+; DEFINE ArrayIndex_FI = ArrayIndex;
+; DEFINE ArrayIndex_DI = ArrayIndex+1;
+										;DEFINE ArrayIndex = *; 
+	ArrayIndex=*
+										; DECLARE ArrayIndex_FI BYTE INITIAL[$FF]; 
+	ArrayIndex_FI .BYT $FF
+										; DECLARE ArrayIndex_DI BYTE INITIAL[$FF]; 
+	ArrayIndex_DI .BYT $FF
+										;DEFINE OS = *; 
+	OS=*
+										; DECLARE OS0 WORD INITIAL[FTDOS]; 
+	OS0 .WORD FTDOS 
+										; DECLARE OS1 WORD INITIAL[SEDORIC]; 
+	OS1 .WORD SEDORIC 
+										;DECLARE FTDOS CHARACTER['---FTDOS--- ']; 
+	FTDOS .BYT '---FTDOS--- '
+										;DECLARE SEDORIC CHARACTER['--SEDORIC-- ']; 
+	SEDORIC .BYT '--SEDORIC-- '
+										;DECLARE OSTYPE BYTE INITIAL[0]; 
+	OSTYPE .BYT 0
+										;DECLARE LEN BYTE INITIAL[0]; 
+	LEN .BYT 0
+;---------------------------------------------------------------------------
+; 
+; Debut du programme 
+; CATDIR 
+; 
+; Variables par defaut: 
+; FI$(): Tableau contenant la la liste des fichiers 
+; FI : Nombre d'elements dans le tableau 
+; ER : Code d'erreur eventuel (erreur CH376) 
+; OS$ : Nom de l'OS supporte (FTDOS/SEDORIC) 
+; 
+; Utilisation: 
+;  <nom_image_dsk>[,[tableau$][,F|S]] 
+; 
+; Exemples: 
+; 10 HIMEM #95F0 
+; 20 DOKE #2F5,DEEK(#95FE) 
+; 
+; 90 REM Utilisation des variables par defaut 
+; 100 DIM FI$(100) 
+; 110  ''FTDOS.DSK'' 
+; 120 FOR I=0 TO FI:PRINT FI$(I):NEXT 
+; 
+; 
+; 190 REM Changement du nom du tableau par defaut 
+; 200 DIM TA$(100) 
+; 210 DN$=''FTDOS.DSK'' 
+; 220  DN$,TA$ 
+; 230 FOR I=0 TO TA:PRINT TA$(I):NEXT 
+; 
+; 
+; 290 REM Reutilise le dernier nom de tableau par defaut 
+; 300  ''FTDOS.DSK'':IF ER<>20 THEN PRINT ''Erreur:'',ER:END 
+; 310 FOR I=0 TO TA:PRINT TA$(I):NEXT 
+;---------------------------------------------------------------------------
+										;CATDIR: 
+	CATDIR 
+										; CALL GetParams; " $91-92 = Adresse de la chaine, LEN=Longueur"; 
+	JSR GetParams 
+										; IF ^.Z THEN GOTO SyntaxError; " Autoriser  '' pour initialiser OS$?"; 
+	BEQ ZZ0001 
+	JMP SyntaxError 
+ZZ0001
+	; Ne faire l'initialisation que lors du 1er appel?
+										; CALL InitCH376; 
+	JSR InitCH376 
+										; IF .Z THEN 
+	BNE ZZ0002 
+										; DO; 
+										; ArrayIndex_FI = $FF; 
+	LDA #$FF
+	STA ArrayIndex_FI 
+										; ArrayIndex_DI = $FF; " Supprimer le LDA #$FF en trop"; 
+	LDA #$FF
+	STA ArrayIndex_DI 
+										; .AY <- H91; 
+	LDA H91 
+	LDY H91+1
+										; .X = LEN; 
+	LDX LEN 
+										; CALL SetDiskname; 
+	JSR SetDiskname 
+										; CALL FileOpen; 
+	JSR FileOpen 
+										; IF .A = #INT_SUCCESS THEN 
+	CMP #INT_SUCCESS 
+	BEQ  *+5
+	JMP ZZ0003 
+										; DO; 
+	; Appel de la procedure en fonction de l'OS
+										; .A = OSTYPE; 
+	LDA OSTYPE 
+										; IF .Z THEN CALL CAT; 
+	BNE ZZ0004 
+	JSR CAT 
+										; ELSE CALL DIR; 
+	JMP ZZ0005 
+ZZ0004
+	JSR DIR 
+ZZ0005
+	; Sauvegarder le code de retour de _CAT
+										; STACK .A; 
+	PHA
+										; CALL FileClose; 
+	JSR FileClose 
+	; Faut-il renvoyer dans ER le code d'erreur de _CAT
+	; ou de FileClose?
+										; UNSTACK .A; 
+	PLA
+										; END; 
+										; END; 
+ZZ0003
+	; Code erreur -> ER
+ZZ0002
+										; .Y = .A; " Poids faible de la valeur"; 
+	TAY
+										; .A = $00; " Poids fort"; 
+	LDA #$00
+										; .X = $04; " Index de 'ER'"; 
+	LDX #$04
+										; CALL SetCH376Var; 
+	JSR SetCH376Var 
+	; Met a jour la variable OS$
+										; .X = OSTYPE; 
+	LDX OSTYPE 
+	; .AY <- OS[.X];
+										; .A = OS[.X]; 
+	LDA OS,X
+										; INC .X; 
+	INX
+										; .Y = OS[.X]; " Instruction implementee dans la v1.9 du 22/02/2020"; 
+	LDY OS,X
+										; .X = $01; 
+	LDX #$01
+										; SET .C; 
+	SEC
+										; CALL AddElt; 
+	JSR AddElt 
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; Recuperation des parametres 
+; 
+; Sortie: 
+; Z : 1 -> OK, 0 -> Erreur 
+; A : $00 -> OK, $FF -> Erreur 
+; $91-92: Adresse de la chaine 
+; LEN :Longueur 
+; OSTYPE: 0 -> FTDOS, 2 -> SEDORIC 
+;---------------------------------------------------------------------------
+										;GetParams: 
+	GetParams 
+	; Recupere le nom du fichier .dsk
+										; CALL EvalExpr; 
+	JSR EvalExpr 
+										; CALL CheckStr; " XY = $91-92 = Adresse de la chaine, A=Longueur"; 
+	JSR CheckStr 
+										; IF ^.Z THEN 
+	BEQ ZZ0006 
+										; BEGIN; 
+										; LEN = .A; 
+	STA LEN 
+	; 2ieme parametre : nom du tableau pour les fichiers
+										; CALL CharGot; 
+	JSR CharGot 
+										; IF ^.Z THEN 
+	BEQ ZZ0007 
+										; BEGIN; 
+										; IFF .A ^= ',' THEN GetParams_err; 
+	CMP #','
+	BNE GetParams_err 
+										; CALL CharGet; 
+	JSR CharGet 
+										; IFF .A = ',' THEN GetOS; 
+	CMP #','
+	BEQ GetOS 
+										; BEGIN; 
+										; ARRAY_FLAG = $40; " Tableau uniquement"; 
+	LDA #$40
+	STA ARRAY_FLAG 
+										; CALL GetVarFromText; 
+	JSR GetVarFromText 
+										; .X = VAR_TYPE; 
+	LDX VAR_TYPE 
+										; IFF .X ^=$FF THEN GetParams_err; " Tableau de chaines?"; 
+	CPX #$FF
+	BNE GetParams_err 
+	; Optimisation: supprimer les LDA inutiles
+										; VARTABLE[0] = VARNAME1; " Sauvegarde le nom du tableau"; 
+	LDA VARNAME1 
+	STA 0+VARTABLE 
+										; VARTABLE[4] = VARNAME1; " et de l'indice"; 
+	LDA VARNAME1 
+	STA 4+VARTABLE 
+										; VARTABLE[1] = VARNAME2; 
+	LDA VARNAME2 
+	STA 1+VARTABLE 
+										; VARTABLE[5] = VARNAME2 .AND $7F; 
+	LDA VARNAME2 
+;
+	AND #$7F
+	STA 5+VARTABLE 
+										; END; 
+	; 3ieme parametre : Choix de l'OS
+										; GetOS: 
+	GetOS 
+										; CALL CharGot; 
+	JSR CharGot 
+										; IF ^.Z THEN 
+	BEQ ZZ0008 
+										; BEGIN; 
+										; IFF .A ^= ',' THEN GetParams_err; 
+	CMP #','
+	BNE GetParams_err 
+										; CALL CharGet; 
+	JSR CharGet 
+										; .X = 0; 
+	LDX #0
+										; IFF .A = 'F' THEN GetOS_OK; 
+	CMP #'F'
+	BEQ GetOS_OK 
+										; .X = 2; 
+	LDX #2
+										; IFF .A ^= 'S' THEN GetParams_err; 
+	CMP #'S'
+	BNE GetParams_err 
+										; GetOS_OK: 
+	GetOS_OK 
+										; BEGIN; 
+	; Passe au caractere suivant,
+	; sinon SYNTAX ERROR au retour au BASIC
+										; CALL CharGet; 
+	JSR CharGet 
+										; OSTYPE = .X; 
+	STX OSTYPE 
+										; END; 
+										; END; 
+										; END; 
+ZZ0008
+										; CLEAR .A; 
+ZZ0007
+	LDA #0
+										; RETURN; 
+	RTS 
+										; END; 
+										; GetParams_err: 
+ZZ0006
+	GetParams_err 
+										; SET .A; 
+	LDA #$FF
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; AddElt: 
+; Met a jour un element d'un tableau alpha ou une variable alpha 
+; 
+; Entree: 
+; C: 0-> tableau, 1-> variable simple 
+; AY: Adresse du nom du fichier (A: poids faible) 
+; X: Indice dans VARTABLE pour le nom du tableau 
+;---------------------------------------------------------------------------
+										;AddElt: 
+	AddElt 
+										; STACK .A, .Y; " Sauvegarde l'adresse de l'entree"; 
+	PHA
+	TYA
+	PHA
+										; STACK .P; " Sauvegarde P pour plus tard"; 
+	PHP
+										; CALL SetVarName; 
+	JSR SetVarName 
+										; UNSTACK .P; " Restaure P pour savoir ce qu'on cherche"; 
+	PLP
+										; CALL FindVarArray; 
+	JSR FindVarArray 
+	;String:
+										; .Y = $02; " Sauvegarde l'adresse de la chaine"; 
+	LDY #$02
+										; REPEAT; 
+ZZ0009
+										; DO; 
+										; .A = @VAR_ADDR[.Y]; 
+	LDA (VAR_ADDR),Y
+										; 'STA TMP_STR-1,Y'; 
+	STA TMP_STR-1,Y
+										; DEC .Y; 
+	DEY
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0009 
+										; .A = @VAR_ADDR[.Y]; " Taille de la chaine"; 
+	LDA (VAR_ADDR),Y
+										; IFF .Z THEN Vide; 
+	BEQ Vide 
+										; .AY <- VAR_ADDR; " Libere la chaine"; 
+	LDA VAR_ADDR 
+	LDY VAR_ADDR+1
+										; CALL FreeStr_04; 
+	JSR FreeStr_04 
+										; Vide: 
+	Vide 
+										; .A = 12; " Longueur de la chaine"; 
+	LDA #12
+										; CALL NewStr; 
+	JSR NewStr 
+										; .Y = $00; 
+	LDY #$00
+										; 'STA (VAR_ADDR),Y'; " Nouvelle longueur dans le desripteur"; 
+	STA (VAR_ADDR),Y
+										; INC .Y; 
+	INY
+	; &VAR_ADDR[.Y] = TMP_STR;
+										; .A = TMP_STR; " Nouvelle adresse de la chaine dans le descripteur"; 
+	LDA TMP_STR 
+										; 'STA (VAR_ADDR), Y'; 
+	STA (VAR_ADDR), Y
+										; INC .Y; 
+	INY
+	; &VAR_ADDR[.Y] = TMP_STR_H;
+										; .A = TMP_STR_H; " Nouvelle adresse de la chaine dans le descripteur"; 
+	LDA TMP_STR_H 
+										; 'STA (VAR_ADDR), Y'; 
+	STA (VAR_ADDR), Y
+										; UNSTACK .Y,.X; 
+	PLA
+	TAY
+	PLA
+	TAX
+										; .A = 12; " Longueur de la chaine"; 
+	LDA #12
+										; CALL CpyStr; " Copie une chaine, XY:adresse de la chaine, ACC: longueur de la 
+	JSR CpyStr 
+										; chaine, $A4-A5: Destination"; 
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; FindVarArray: 
+; Recherche l'adresse d'une variable/tableau 
+; 
+; Entree: 
+; C: 0->Tableau, 1->Variable simple 
+; X: Indice du tableau dans ArrayIndex[] 
+;---------------------------------------------------------------------------
+										;FindVarArray: 
+	FindVarArray 
+										; IF ^.C THEN 
+	BCS ZZ0010 
+										; BEGIN; 
+										; VARFOUND = $00; " Consultation"; 
+	LDA #$00
+	STA VARFOUND 
+										; ARRAY_FLAG = .A; " Atmos uniquement:on veut l'adresse d'un element et non cel 
+	STA ARRAY_FLAG 
+										;le du tableau"; 
+										; STACK .A; " MSB indice du tableau (<255)"; 
+	PHA
+										; LINESIZE = $01; " Tableau a 1 dimension"; 
+	LDA #$01
+	STA LINESIZE 
+										; .A = ArrayIndex[.X]; " LSB indice du tableau"; 
+	LDA ArrayIndex,X
+										; STACK .A; 
+	PHA
+										; GOTO FindArrayElt; 
+	JMP FindArrayElt 
+										; END; 
+										; GOTO FindVar; 
+ZZ0010
+	JMP FindVar 
+;RETURN;
+;---------------------------------------------------------------------------
+; SetCH376Var: 
+; Met a jour une variable 
+; 
+; Entree: 
+; AY: Valeur entiere de la variable 
+; X: Indice de la variable dans le tableau VARTABLE 
+;---------------------------------------------------------------------------
+										;SetCH376Var: 
+	SetCH376Var 
+										; CALL SetVarName; 
+	JSR SetVarName 
+										; GOTO SetVar; 
+	JMP SetVar 
+;RETURN
+;---------------------------------------------------------------------------
+; SetVarName: 
+; Place le nom de la variable .X dans VARNAME1, VARNAME2 
+; 
+; Entree: 
+; X: Indice dans VARTABLE 
+; 
+; Sortie: 
+; A: Inchange 
+; X: Inchange 
+; Y: Inchange 
+;---------------------------------------------------------------------------
+										;SetVarName: 
+	SetVarName 
+										; STACK .A, .X; " Sauvegarde A et X pour plus tard"; 
+	PHA
+	TXA
+	PHA
+										; SHIFT LEFT A; 
+	ASL
+										; .X = .A; 
+	TAX
+										; VARNAME1 = VARTABLE[.X]; 
+	LDA VARTABLE,X
+	STA VARNAME1 
+										; INC .X; 
+	INX
+										; VARNAME2 = VARTABLE[.X]; 
+	LDA VARTABLE,X
+	STA VARNAME2 
+										; UNSTACK .X, .A; " Restaure X & A"; 
+	PLA
+	TAX
+	PLA
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; SetVar: 
+; Met a jour une variable flotante 
+; 
+; Entree: 
+; AY: Valeur entiere de la variable 
+; VARNAME1,VARNAME2: Nom de la variable 
+;---------------------------------------------------------------------------
+										;SetVar: 
+	SetVar 
+										; CALL GIVAYF; " Conversion Entier -> FACC1"; 
+	JSR GIVAYF 
+										; CALL FindVar; " Recherche la variable (adresse en AY)"; 
+	JSR FindVar 
+										; .X = .A; 
+	TAX
+										; GOTO MOVMF; " MOVMF necessite que l'adresse soit en XY"; 
+	JMP MOVMF 
+;RETURN;
+;---------------------------------------------------------------------------
+; PrintAY: 
+; Affiche une chaine a l'ecran 
+; 
+; Entree: 
+; AY: Adresse de la chaine 
+; X: Longueur de la chaine 
+;---------------------------------------------------------------------------
+										;PrintAY: 
+	PrintAY 
+										; H91 <-.AY; " AY: Adresse de la chaine"; 
+	STA H91 
+	STY H91+1
+	; X: Longueur de la chaine
+										; GOTO PrintString_07; 
+	JMP PrintString_07 
+;RETURN;
+;---------------------------------------------------------------------------
+; Fin du programme 
+;---------------------------------------------------------------------------
+; ==========================================================================
+;---------------------------------------------------------------------------
+; Lecture du catalogue d'une image FTDOS 
+;---------------------------------------------------------------------------
+										;CAT: 
+	CAT 
+	; 1er secteur du catalogue
+										; NP = 20; 
+	LDA #20
+	STA NP 
+										; NS = 2; 
+	LDA #2
+	STA NS 
+										; BUFFER_PTR =## BUFFER2; 
+	LDA #<BUFFER2 
+	STA BUFFER_PTR 
+	LDA #>BUFFER2 
+	STA BUFFER_PTR+1
+										; REPEAT; 
+ZZ0011
+										; DO; 
+										; CALL _ReadSector; " Dure environ 62000 cycles"; 
+	JSR _ReadSector 
+										; IFF .A ^= #INT_SUCCESS THEN CAT_End; 
+	CMP #INT_SUCCESS 
+	BNE CAT_End 
+	; Traitement du secteur du catalogue
+	; Dure 583 cycles sans l'affichage
+	;FOR I=4 TO 238 BY 18
+										; I = 4; 
+	LDA #4
+	STA I 
+										; REPEAT; 
+ZZ0012
+										; DO; 
+	; Optimisation: supprimer le LDA I inutile, deja fait
+										; IF BUFFER2[I] ^= $FF THEN 
+	LDA I 
+	TAY
+	LDA #$FF
+	CMP BUFFER2,Y
+	BNE  *+5
+	JMP ZZ0013 
+										; DO; 
+	; Ici .Y = I
+	; On saute la piste et le secteur du FCB
+										; INC .Y; 
+	INY
+										; INC .Y; 
+	INY
+	; On saute l'octet de verrouillage
+										; INC .Y; 
+	INY
+	; Adresse du nom de fichier dans AY
+										; .A = .Y; 
+	TYA
+										; .Y = #>BUFFER2; 
+	LDY #>BUFFER2 
+	; Affiche l'entree du catalogue
+	;.X = 12;
+	;CALL PrintAY;
+	;.A = 13; CALL PrintA;
+	;.A = 10; CALL PrintA;
+	; Met a jour le tableau
+										; .X = $00; 
+	LDX #$00
+										; 'INC ArrayIndex,X'; 
+	INC ArrayIndex,X
+										; CLEAR .C; CALL AddElt; 
+	CLC
+	JSR AddElt 
+										; END; 
+										; I = I+18; 
+ZZ0013
+	LDA I 
+	CLC
+	ADC #18
+	STA I 
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0012 
+	; Passage au secteur suivant
+										; .Y = 2; 
+	LDY #2
+										; NP = BUFFER2[.Y]; " .A = ZP_PTR[.Y]; NP = .A;"; 
+	LDA BUFFER2,Y
+	STA NP 
+										; INC .Y; 
+	INY
+										; NS = BUFFER2[.Y]; " .A = ZP_PTR[.Y]; NS = .A;"; 
+	LDA BUFFER2,Y
+	STA NS 
+	; NS=0 si dernier secteur du catalogue atteint
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0011 
+										; .Y = ArrayIndex_FI; " Valeur de la variable (poids faible)"; 
+	LDY ArrayIndex_FI 
+										; .A = $00; 
+	LDA #$00
+										; .X = $02; " Index de la variable 'FI'"; 
+	LDX #$02
+										; CALL SetCH376Var; 
+	JSR SetCH376Var 
+	; On indique le dernier secteur lu
+										; .Y = 1; 
+	LDY #1
+										; NS = BUFFER2[.Y]; 
+	LDA BUFFER2,Y
+	STA NS 
+										; DEC .Y; 
+	DEY
+										; NP = BUFFER2[.Y]; 
+	LDA BUFFER2,Y
+	STA NP 
+	; Indique que tout s'est bien passe
+										; .A = #INT_SUCCESS; 
+	LDA #INT_SUCCESS 
+										;CAT_End: 
+	CAT_End 
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; Lecture du catalogue d'une image Sedoric 
+;---------------------------------------------------------------------------
+										;DIR: 
+	DIR 
+	; 1er secteur du catalogue
+										; NP = 20; 
+	LDA #20
+	STA NP 
+										; NS = 4; 
+	LDA #4
+	STA NS 
+										; BUFFER_PTR =## BUFFER2; 
+	LDA #<BUFFER2 
+	STA BUFFER_PTR 
+	LDA #>BUFFER2 
+	STA BUFFER_PTR+1
+										; REPEAT; 
+ZZ0014
+										; DO; 
+										; CALL _ReadSector; " Dure environ 62000 cycles"; 
+	JSR _ReadSector 
+										; IFF .A ^= #INT_SUCCESS THEN DIR_End; 
+	CMP #INT_SUCCESS 
+	BNE DIR_End 
+	; Traitement du secteur du catalogue
+										; I = 16; 
+	LDA #16
+	STA I 
+										; REPEAT; 
+ZZ0015
+										; DO; 
+										; CLEAR .C; 
+	CLC
+										; .A+13; 
+	ADC #13
+										; .Y = .A; 
+	TAY
+										; IF BUFFER2[.Y] ^= $00 THEN 
+	LDA #$00
+	CMP BUFFER2,Y
+	BNE  *+5
+	JMP ZZ0016 
+										; DO; 
+	; Adresse du nom de fichier dans AY
+										; .A = I; 
+	LDA I 
+										; .Y = #>BUFFER2; 
+	LDY #>BUFFER2 
+	; Affiche l'entree du catalogue
+	;.X = 12;
+	;CALL PrintAY;
+	;.A = 13; CALL PrintA;
+	;.A = 10; CALL PrintA;
+	; Met a jour le tableau
+										; .X = $00; 
+	LDX #$00
+										; 'INC ArrayIndex,X'; 
+	INC ArrayIndex,X
+										; CLEAR .C; CALL AddElt; 
+	CLC
+	JSR AddElt 
+										; END; 
+										; I = I+16; 
+ZZ0016
+	LDA I 
+	CLC
+	ADC #16
+	STA I 
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0015 
+	; Passage au secteur suivant
+										; .Y = 0; 
+	LDY #0
+										; NP = BUFFER2[.Y]; " .A = ZP_PTR[.Y]; NP = .A;"; 
+	LDA BUFFER2,Y
+	STA NP 
+										; INC .Y; 
+	INY
+										; NS = BUFFER2[.Y]; " .A = ZP_PTR[.Y]; NS = .A;"; 
+	LDA BUFFER2,Y
+	STA NS 
+	; NS=0 si dernier secteur du catalogue atteint
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0014 
+										; .Y = ArrayIndex_FI; " Valeur de la variable (poids faible)"; 
+	LDY ArrayIndex_FI 
+										; .A = $00; 
+	LDA #$00
+										; .X = $02; " Index de la variable 'FI'"; 
+	LDX #$02
+										; CALL SetCH376Var; 
+	JSR SetCH376Var 
+	; On indique le dernier secteur lu
+										; .Y = 1; 
+	LDY #1
+										; NS = BUFFER2[.Y]; 
+	LDA BUFFER2,Y
+	STA NS 
+										; DEC .Y; 
+	DEY
+										; NP = BUFFER2[.Y]; 
+	LDA BUFFER2,Y
+	STA NP 
+	; Indique que tout s'est bien passe
+										; .A = #INT_SUCCESS; 
+	LDA #INT_SUCCESS 
+										;DIR_End: 
+	DIR_End 
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; 
+;---------------------------------------------------------------------------
+;Error:
+; .Y = .A;
+; CLEAR .A;
+;RETURN;
+;---------------------------------------------------------------------------
+; 
+;---------------------------------------------------------------------------
+										;SetDiskname: 
+	SetDiskname 
+	; TODO: Faire une fonction SetFilename2 qui saute les ' '
+	; Longeur de la chaine
+										; IF .X >=12 THEN .X = 12; 
+	CPX #12
+	BCS  *+5
+	JMP ZZ0017 
+	LDX #12
+										; PTR_READ_DEST <- .AY; 
+ZZ0017
+	STA PTR_READ_DEST 
+	STY PTR_READ_DEST+1
+										; CH376_COMMAND = $2F; 
+	LDA #$2F
+	STA CH376_COMMAND 
+										; CLEAR .Y; 
+	LDY #0
+										; REPEAT; 
+ZZ0018
+										; DO; 
+										; .A = @PTR_READ_DEST[.Y]; 
+	LDA (PTR_READ_DEST),Y
+										; CH376_DATA = .A; 
+	STA CH376_DATA 
+										; INC .Y; 
+	INY
+										; DEC .X; 
+	DEX
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0018 
+										; CH376_DATA = $00; 
+	LDA #$00
+	STA CH376_DATA 
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; 
+; ReadSectotr 
+; 
+;---------------------------------------------------------------------------
+; Entree: 
+; Le fichier .dsk doit avoir ete ouvert 
+; NP: N? de la piste 
+; NS: N? du secteur 
+;BUFFER_PTR: Adresse du buffer pour le secteur a lire 
+; 
+; Sortie: 
+; AY: Code erreur CH376 ($14 si Ok) 
+;---------------------------------------------------------------------------
+										;_ReadSector: 
+	_ReadSector 
+										; .A = NP; 
+	LDA NP 
+										; CALL TrackOffset; 
+	JSR TrackOffset 
+										; CALL ByteLocate; 
+	JSR ByteLocate 
+	;IFF ^.Z THEN RS_End;" " Trop loin sans les optimisations
+										; IF ^.Z THEN GOTO RS_End; 
+	BEQ ZZ0019 
+	JMP RS_End 
+										; .A = #<TrackSize; 
+ZZ0019
+	LDA #<TrackSize 
+										; .Y = #>TrackSize; 
+	LDY #>TrackSize 
+										; CALL SetByteRead; 
+	JSR SetByteRead 
+										; IFF ^.Z THEN RS_End; 
+	BNE RS_End 
+										; .A = #<BUFFER; 
+	LDA #<BUFFER 
+										; .Y = #>BUFFER; 
+	LDY #>BUFFER 
+										; CALL ReadUSBData; 
+	JSR ReadUSBData 
+	;IFF .Y = 0 THEN Error;
+										; ZP_PTR <- BUFFER_PTR; 
+	LDA BUFFER_PTR 
+	STA ZP_PTR 
+	LDA BUFFER_PTR+1
+	STA ZP_PTR+1
+										; CLEAR .V; 
+	CLV
+										; REPEAT; 
+ZZ0020
+										; BEGIN; 
+	; GAP1 / GAP4 / GAP2 / GAP5
+	;Remplacer BEQ *+5 / JMP ZZxxxx par BNE ZZxxxx
+										; REPEAT; 
+ZZ0021
+										; BEGIN; 
+										; CALL GetByte; 
+	JSR GetByte 
+	; Si fin du fichier, on force la sortie
+										; IF .O THEN .A = $FE; 
+	BVC ZZ0022 
+	LDA #$FE
+										; END; 
+ZZ0022
+										; UNTIL .A = $FE; 
+	CMP #$FE
+	BEQ  *+5
+	JMP ZZ0021 
+										; IF ^.O THEN 
+	BVS ZZ0023 
+										; DO; 
+	; ID Field
+										; CALL GetByte; Track = .A; 
+	JSR GetByte 
+	STA Track 
+										; CALL GetByte; Head = .A; 
+	JSR GetByte 
+	STA Head 
+										; CALL GetByte; Sector = .A; 
+	JSR GetByte 
+	STA Sector 
+										; CALL GetByte; Size = .A; 
+	JSR GetByte 
+	STA Size 
+										; CALL GetByte; CRC_L = .A; 
+	JSR GetByte 
+	STA CRC_L 
+										; CALL GetByte; CRC_H = .A; 
+	JSR GetByte 
+	STA CRC_H 
+	; GAP 3
+	;Remplacer BEQ *+5 / JMP ZZxxxx par BNE ZZxxxx
+										; REPEAT; CALL GetByte; UNTIL .A = $FB; 
+ZZ0024
+	JSR GetByte 
+	CMP #$FB
+	BEQ  *+5
+	JMP ZZ0024 
+	; Data (lecture de 256 octets)
+	; Ne tient pas compte de Size
+	; A voir pour sauter plus rapidement les 256 octets
+	; du secteur si ce n'est pas le bon
+										; .Y = 0; 
+	LDY #0
+										; REPEAT; 
+ZZ0025
+										; BEGIN; 
+										; CALL GetByte; 
+	JSR GetByte 
+										; 'STA (ZP_PTR),Y'; 
+	STA (ZP_PTR),Y
+										; INC .Y; 
+	INY
+										; END; 
+										; UNTIL .Z; 
+	BNE ZZ0025 
+	; Data CRC
+										; CALL GetByte; CRC_L = .A; 
+	JSR GetByte 
+	STA CRC_L 
+										; CALL GetByte; CRC_H = .A; 
+	JSR GetByte 
+	STA CRC_H 
+	; Secteur trouve, on sort
+	;Remplacer BEQ *+5 / JMP ZZxxxx par BNE ZZxxxx
+										; IF Sector = NS THEN CALL SEV; 
+	LDA NS 
+	CMP Sector 
+	BEQ  *+5
+	JMP ZZ0026 
+	JSR SEV 
+										; END; 
+ZZ0026
+										; END; 
+ZZ0023
+										; UNTIL .O; 
+	BVC ZZ0020 
+	; On arrive ici avec .A = $FE ou Sector = NS (et .A = Sector)
+	;CALL FileClose;
+	; Si le secteur n'a pas ete trouve, on indique une erreur
+	; Sinon le code de retour est celui de FileClose soit $14
+	; normalement (a modifier eventuellement au cas ou le
+	; FileClose se passe mal?)
+										; .Y = #INT_SUCCESS; 
+	LDY #INT_SUCCESS 
+										; IF Sector ^= NS THEN .Y = $FF; 
+	LDA NS 
+	CMP Sector 
+	BNE  *+5
+	JMP ZZ0027 
+	LDY #$FF
+										; .A = .Y; 
+ZZ0027
+	TYA
+										;RS_End: 
+	RS_End 
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; 
+;---------------------------------------------------------------------------
+										;SEV: 
+	SEV 
+										; 'BIT *-1'; 
+	BIT *-1
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; TrackOffset: 
+; Calcule l'offset d'une piste = Piste * 25 + 256 
+; (6400 = 25 * 256) 
+; 
+; Entree: 
+; ACC: N? de piste 
+; 
+; Sortie: 
+; ACC: Poids faible du resultat -1 
+; OFFSET: Resultat sur 16 bits 
+; 
+; Utilise: 
+; OFFSET: 16 bits, resultat 
+; 
+; La valeur sur 32 bits: 0 total_h total_l 0 
+; Pas de debordement sur le 4ieme octet tant que 
+; le n? de piste < 2622 (=65535/25) 
+; 
+; En principe tous les CLC sont inutiles 
+; 
+; Voir routine optimisee plus bas 
+;---------------------------------------------------------------------------
+										;TrackOffset: 
+	TrackOffset 
+	; STACK A;"; " Si on ne veut pas utiliser .Y 
+	;Initialise OFFSET[]
+										; .Y = 0; " Remplacer .Y par .A si on veut conserver .Y "; 
+	LDY #0
+										; OFFSET_0 = .Y; 
+	STY OFFSET_0 
+										; OFFSET_L = .A; 
+	STA OFFSET_L 
+										; OFFSET_H = .Y; 
+	STY OFFSET_H 
+										; OFFSET_3 = .Y; 
+	STY OFFSET_3 
+	; x2
+										; SHIFT LEFT OFFSET_L; 
+	ASL OFFSET_L 
+										; ROTATE LEFT OFFSET_H; 
+	ROL OFFSET_H 
+	; +1 -> x3
+										; STACK .A; 
+	PHA
+										; CLEAR .C; 
+	CLC
+										; .A + OFFSET_L; OFFSET_L = .A; 
+	ADC OFFSET_L 
+	STA OFFSET_L 
+										; IF .C THEN INC OFFSET_H; 
+	BCC ZZ0028 
+	INC OFFSET_H 
+	; x8 -> x24
+ZZ0028
+										; SHIFT LEFT OFFSET_L; 
+	ASL OFFSET_L 
+										; ROTATE LEFT OFFSET_H; 
+	ROL OFFSET_H 
+										; SHIFT LEFT OFFSET_L; 
+	ASL OFFSET_L 
+										; ROTATE LEFT OFFSET_H; 
+	ROL OFFSET_H 
+										; SHIFT LEFT OFFSET_L; 
+	ASL OFFSET_L 
+										; ROTATE LEFT OFFSET_H; 
+	ROL OFFSET_H 
+	; +1 -> x25
+										; UNSTACK .A; 
+	PLA
+										; CLEAR .C; 
+	CLC
+										; .A + OFFSET_L; OFFSET_L = .A; 
+	ADC OFFSET_L 
+	STA OFFSET_L 
+										; IF .C THEN INC OFFSET_H; 
+	BCC ZZ0029 
+	INC OFFSET_H 
+	; +256
+ZZ0029
+										; INCW OFFSET_L; 
+	INC OFFSET_L 
+	BNE ZZ0030 
+	INC OFFSET_L+1
+ZZ0030
+	;.A = OFFSET_L
+	;.Y = OFFSET_H
+										;RETURN; 
+	RTS 
+;---------------------------------------------------------------------------
+; Fin du programme 
+;---------------------------------------------------------------------------
+										;'#include "lib/CH376.s"'; 
+#include "lib/CH376.s"
+										;EXIT; 
+	END

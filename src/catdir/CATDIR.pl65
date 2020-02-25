@@ -1,0 +1,817 @@
+'#define WOR word';
+
+'#include <include/CH376.h>';
+'#include <include/BASIC.h>';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 0                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE * = $0A;
+DECLARE R0 WORD;
+DECLARE R1 ;
+
+" Re-utilise l'emplacement de OFFSET_xxx";
+DEFINE * = $05;
+DECLARE Track  ;
+DECLARE Head   ;
+DECLARE Sector ;
+DECLARE Size   ;
+
+" Déplacé dans le programme";
+"DEFINE * = $F7;";
+"DECLARE ArrayIndex[2];";
+"	DEFINE ArrayIndex_FI = ArrayIndex;";
+"	DEFINE ArrayIndex_DI = ArrayIndex+1;";
+
+DEFINE * = $F7;
+DECLARE CRC WORD;
+	DEFINE CRC_L = CRC;
+	DEFINE CRC_H = CRC_L+1;
+
+
+" /!\ ATTENTION";
+" Re-utilise l'emplacement de PTW ($F5)";
+DEFINE ZP_PTR = PTW;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 2                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       Variables en page 4                                 ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+" Variables FTDOS                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE * = $048C;
+DECLARE NLU;
+DECLARE NP ;
+DECLARE NS ;
+DECLARE BUFFER_PTR WORD;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                   Adresses des Buffers ou Tables                          ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                            Defines                                        ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE TrackSize = 6400;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                       En-tete fichier .tap                                ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+'AUTOEXEC = 0';
+'        .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC';
+'        .db >END, <END, >($9600-2), <($9600-2), $0C, "CH376-CATDIR", $00';
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                         Variables et buffers                              ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+DEFINE I = R0;
+
+
+DEFINE * = $9600-2;
+DATAW CATDIR;
+
+DECLARE BUFFER[256];
+"'.dsb 256,0';";
+
+DECLARE BUFFER2[256];
+"'.dsb 256,0';";
+
+VARTABLE:
+	" Arrays";
+	STRING 'FI';
+
+	" Strings";
+	STRING 'OS';
+
+	" Float vars";
+	DECLARE FI CHARACTER['FI'];
+	DECLARE DI CHARACTER['DI'];
+	DECLARE ER CHARACTER['ER'];
+
+
+" Déplacé ici car $F7-F8 est utilisé pour la lecture de fichier";
+"DECLARE ArrayIndex[2];";
+"'.dsb 2,0';";
+"	DEFINE ArrayIndex_FI = ArrayIndex;";
+"	DEFINE ArrayIndex_DI = ArrayIndex+1;";
+
+DEFINE ArrayIndex = *;
+	DECLARE ArrayIndex_FI BYTE INITIAL[$FF];
+	DECLARE ArrayIndex_DI BYTE INITIAL[$FF];
+
+DEFINE OS = *;
+	DECLARE OS0 WORD INITIAL[FTDOS];
+	DECLARE OS1 WORD INITIAL[SEDORIC];
+
+DECLARE FTDOS   CHARACTER['---FTDOS--- '];
+DECLARE SEDORIC CHARACTER['--SEDORIC-- '];
+
+DECLARE OSTYPE BYTE INITIAL[0];
+
+DECLARE LEN BYTE INITIAL[0];
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                        Debut du programme                                 ";
+"  CATDIR                                                                   ";
+"                                                                           ";
+" Variables par défaut:                                                     ";
+"     FI$(): Tableau contenant la la liste des fichiers                     ";
+"     FI   : Nombre d'éléments dans le tableau                              ";
+"     ER   : Code d'erreur éventuel (erreur CH376)                          ";
+"     OS$  : Nom de l'OS supporté (FTDOS/SEDORIC)                           ";
+"                                                                           ";
+" Utilisation:                                                              ";
+"      !<nom_image_dsk>[,[tableau$][,F|S]]                                  ";
+"                                                                           ";
+" Exemples:                                                                 ";
+"     10 HIMEM #95F0                                                        ";
+"     20 DOKE #2F5,DEEK(#95FE)                                              ";
+"                                                                           ";
+"      90 REM Utilisation des variables par défaut                          ";
+"     100 DIM FI$(100)                                                      ";
+"     110 !''FTDOS.DSK''                                                    ";
+"     120 FOR I=0 TO FI:PRINT FI$(I):NEXT                                   ";
+"                                                                           ";
+"                                                                           ";
+"     190 REM Changement du nom du tableau par défaut                       ";
+"     200 DIM TA$(100)                                                      ";
+"     210 DN$=''FTDOS.DSK''                                                 ";
+"     220 !DN$,TA$                                                          ";
+"     230 FOR I=0 TO TA:PRINT TA$(I):NEXT                                   ";
+"                                                                           ";
+"                                                                           ";
+"     290 REM Réutilise le dernier nom de tableau par défaut                ";
+"     300 !''FTDOS.DSK'':IF ER<>20 THEN PRINT ''Erreur:'',ER:END            ";
+"     310 FOR I=0 TO TA:PRINT TA$(I):NEXT                                   ";
+"---------------------------------------------------------------------------";
+CATDIR:
+	CALL GetParams;		" $91-92 = Adresse de la chaine, LEN=Longueur";
+	IF ^.Z THEN GOTO SyntaxError;	" Autoriser !'' pour initialiser OS$?";
+
+	" Ne faire l'initialisation que lors du 1er appel?";
+	CALL InitCH376;
+
+	IF .Z THEN
+	DO;
+		ArrayIndex_FI = $FF;
+		ArrayIndex_DI = $FF;						" Supprimer le LDA #$FF en trop";
+
+		.AY <- H91;
+		.X = LEN;
+		CALL SetDiskname;
+
+		CALL FileOpen;
+		IF .A = #INT_SUCCESS THEN
+		DO;
+			" Appel de la procédure en fonction de l'OS";
+			.A = OSTYPE;
+
+			IF .Z THEN CALL CAT;
+			ELSE CALL DIR;
+
+			" Sauvegarder le code de retour de _CAT";
+			STACK .A;
+
+			CALL FileClose;
+
+			" Faut-il renvoyer dans ER le code d'erreur de _CAT";
+			" ou de FileClose?";
+			UNSTACK .A;
+		END;
+	END;
+
+	" Code erreur -> ER";
+	.Y = .A;		" Poids faible de la valeur";
+	.A = $00;		" Poids fort";
+	.X = $04;		" Index de 'ER'";
+	CALL SetCH376Var;
+
+
+	" Met à jour la variable OS$";
+	.X = OSTYPE;
+
+	" .AY <- OS[.X];";
+	.A = OS[.X];
+	INC .X;
+	.Y = OS[.X];		" Instruction implémentée dans la v1.9 du 22/02/2020";
+
+	.X = $01;
+	SET .C;
+	CALL AddElt;
+RETURN;
+
+"---------------------------------------------------------------------------";
+"                         Recuperation des parametres                       ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"      Z      : 1 -> OK, 0 -> Erreur                                        ";
+"      A      : $00 -> OK, $FF -> Erreur                                    ";
+"      $91-92: Adresse de la chaine                                         ";
+"      LEN   :Longueur                                                      ";
+"      OSTYPE: 0 -> FTDOS, 2 -> SEDORIC                                     ";
+"---------------------------------------------------------------------------";
+GetParams:
+	" Recupere le nom du fichier .dsk";
+	CALL EvalExpr;
+	CALL CheckStr;								" XY = $91-92 = Adresse de la chaine, A=Longueur";
+	IF ^.Z THEN
+	BEGIN;
+		LEN = .A;
+
+		" 2ieme parametre : nom du tableau pour les fichiers";
+		CALL CharGot;
+		IF ^.Z THEN
+		BEGIN;
+			IFF .A ^= ',' THEN GetParams_err;
+
+			CALL CharGet;
+
+			IFF .A = ',' THEN GetOS;
+			BEGIN;
+				ARRAY_FLAG = $40;				" Tableau uniquement";
+				CALL GetVarFromText;
+
+				.X = VAR_TYPE;
+				IFF .X ^=$FF THEN GetParams_err;		" Tableau de chaines?";
+
+				" Optimisation: supprimer les LDA inutiles";
+				VARTABLE[0] = VARNAME1;				" Sauvegarde le nom du tableau";
+				VARTABLE[4] = VARNAME1;				" et de l'indice";
+				VARTABLE[1] = VARNAME2;
+				VARTABLE[5] = VARNAME2 .AND $7F;
+			END;
+
+			" 3ieme parametre : Choix de l'OS";
+			GetOS:
+			CALL CharGot;
+			IF ^.Z THEN
+			BEGIN;
+				IFF .A ^= ',' THEN GetParams_err;
+
+				CALL CharGet;
+
+				.X = 0;
+				IFF .A = 'F' THEN GetOS_OK;
+
+				.X = 2;
+				IFF .A ^= 'S' THEN GetParams_err;
+
+				GetOS_OK:
+				BEGIN;
+					" Passe au caractère suivant,";
+					" sinon SYNTAX ERROR au retour au BASIC";
+					CALL CharGet;
+					OSTYPE = .X;
+				END;
+			END;
+		END;
+
+		CLEAR .A;
+		RETURN;
+	END;
+
+	GetParams_err:
+	SET .A;
+RETURN;
+
+"---------------------------------------------------------------------------";
+" AddElt:                                                                   ";
+"        Met a jour un element d'un tableau alpha ou une variable alpha     ";
+"                                                                           ";
+" Entrée:                                                                   ";
+"       C: 0-> tableau, 1-> variable simple                                 ";
+"      AY: Adresse du nom du fichier (A: poids faible)                      ";
+"       X: Indice dans VARTABLE pour le nom du tableau                      ";
+"---------------------------------------------------------------------------";
+AddElt:
+	STACK .A, .Y;			" Sauvegarde l'adresse de l'entrée";
+	STACK .P;			" Sauvegarde P pour plus tard";
+
+	CALL SetVarName;
+	UNSTACK .P;			" Restaure P pour savoir ce qu'on cherche";
+	CALL FindVarArray;
+
+	"String:";
+	.Y = $02;			" Sauvegarde l'adresse de la chaine";
+	REPEAT;
+	DO;
+		.A = @VAR_ADDR[.Y];
+		'STA TMP_STR-1,Y';
+		DEC .Y;
+	END;
+	UNTIL .Z;
+
+	.A = @VAR_ADDR[.Y];		" Taille de la chaine";
+	IFF .Z THEN Vide;
+
+	.AY <- VAR_ADDR;		" Libère la chaine";
+	CALL FreeStr_04;
+
+	Vide:
+	.A = 12;			" Longueur de la chaine";
+	CALL NewStr;
+
+	.Y = $00;
+	'STA (VAR_ADDR),Y';		" Nouvelle longueur dans le desripteur";
+
+	INC .Y;
+					" &VAR_ADDR[.Y] = TMP_STR;";
+	.A = TMP_STR;			" Nouvelle adresse de la chaine dans le descripteur";
+	'STA (VAR_ADDR), Y';
+
+	INC .Y;
+					" &VAR_ADDR[.Y] = TMP_STR_H;";
+	.A = TMP_STR_H;			" Nouvelle adresse de la chaine dans le descripteur";
+	'STA (VAR_ADDR), Y';
+
+	UNSTACK .Y,.X;
+	.A = 12;			" Longueur de la chaine";
+	CALL CpyStr;			" Copie une chaine, XY:adresse de la chaine, ACC: longueur de la chaine, $A4-A5: Destination";
+RETURN;
+
+"---------------------------------------------------------------------------";
+" FindVarArray:                                                             ";
+"           Recherche l'adresse d'une variable/tableau                      ";
+"                                                                           ";
+" Entrée:                                                                   ";
+"      C: 0->Tableau, 1->Variable simple                                    ";
+"      X: Indice du tableau dans ArrayIndex[]                               ";
+"---------------------------------------------------------------------------";
+FindVarArray:
+	IF ^.C THEN
+	BEGIN;
+		VARFOUND = $00;		" Consultation";
+		ARRAY_FLAG = .A;	" Atmos uniquement:on veut l'adresse d'un element et non celle du tableau";
+
+		STACK .A;		" MSB indice du tableau (<255)";
+
+		LINESIZE = $01;		" Tableau à 1 dimension";
+
+		.A = ArrayIndex[.X];	" LSB indice du tableau";
+		STACK .A;
+
+		GOTO FindArrayElt;
+	END;
+
+	GOTO FindVar;
+"RETURN;";
+
+"---------------------------------------------------------------------------";
+" SetCH376Var:                                                              ";
+"          Met a jour une variable                                          ";
+"                                                                           ";
+" Entrée:                                                                   ";
+"     AY: Valeur entière de la variable                                     ";
+"      X: Indice de la variable dans le tableau VARTABLE                    ";
+"---------------------------------------------------------------------------";
+SetCH376Var:
+	CALL SetVarName;
+	GOTO SetVar;
+"RETURN";
+
+"---------------------------------------------------------------------------";
+" SetVarName:                                                               ";
+"     Place le nom de la variable .X dans VARNAME1, VARNAME2                ";
+"                                                                           ";
+" Entrée:                                                                   ";
+"    X: Indice dans VARTABLE                                                ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"    A: Inchangé                                                            ";
+"    X: Inchangé                                                            ";
+"    Y: Inchangé                                                            ";
+"---------------------------------------------------------------------------";
+SetVarName:
+	STACK .A, .X;			" Sauvegarde A et X pour plus tard";
+
+	SHIFT LEFT A;
+	.X = .A;
+
+	VARNAME1 = VARTABLE[.X];
+	INC .X;
+	VARNAME2 = VARTABLE[.X];
+
+	UNSTACK .X, .A;		" Restaure X & A";
+RETURN;
+
+"---------------------------------------------------------------------------";
+" SetVar:                                                                   ";
+"       Met a jour une variable flotante                                    ";
+"                                                                           ";
+" Entrée:                                                                   ";
+"       AY: Valeur entière de la variable                                   ";
+"       VARNAME1,VARNAME2: Nom de la variable                               ";
+"---------------------------------------------------------------------------";
+SetVar:
+	CALL GIVAYF;			" Conversion Entier -> FACC1";
+	CALL FindVar;			" Recherche la variable (adresse en AY)";
+	.X = .A;
+	GOTO MOVMF;			" MOVMF nécessite que l'adresse soit en XY";
+"RETURN;";
+
+"---------------------------------------------------------------------------";
+" PrintAY:                                                                  ";
+"       Affiche une chaine à l'écran                                        ";
+"                                                                           ";
+" Entrée:                                                                   ";
+"       AY: Adresse de la chaine                                            ";
+"        X: Longueur de la chaine                                           ";
+"---------------------------------------------------------------------------";
+PrintAY:
+	H91 <-.AY;			" AY: Adresse de la chaine";
+					"  X: Longueur de la chaine";
+	GOTO PrintString_07;
+"RETURN;";
+
+"---------------------------------------------------------------------------";
+"                          Fin du programme                                 ";
+"---------------------------------------------------------------------------";
+
+" ==========================================================================";
+
+"---------------------------------------------------------------------------";
+"                 Lecture du catalogue d'une image FTDOS                    ";
+"---------------------------------------------------------------------------";
+CAT:
+	" 1er secteur du catalogue";
+	NP = 20;
+	NS =  2;
+	BUFFER_PTR =## BUFFER2;
+
+	REPEAT;
+	DO;
+		CALL _ReadSector;	" Dure environ 62000 cycles";
+		IFF .A ^= #INT_SUCCESS THEN CAT_End;
+
+		" Traitement du secteur du catalogue";
+		" Dure 583 cycles sans l'affichage";
+		"FOR I=4 TO 238 BY 18";
+		I = 4;
+		REPEAT;
+		DO;
+			" Optimisation: supprimer le LDA I inutile, déjà fait";
+			IF BUFFER2[I] ^= $FF THEN
+			DO;
+				" Ici .Y = I";
+				" On saute la piste et le secteur du FCB";
+				INC .Y;
+				INC .Y;
+
+				" On saute l'octet de verrouillage";
+				INC .Y;
+
+				" Adresse du nom de fichier dans AY";
+				.A = .Y;
+				.Y = #>BUFFER2;
+
+				" Affiche l'entrée du catalogue";
+				".X = 12;";
+				"CALL PrintAY;";
+
+				".A = 13; CALL PrintA;";
+				".A = 10; CALL PrintA;";
+
+				" Met à jour le tableau";
+				.X = $00;
+				'INC ArrayIndex,X';
+
+				CLEAR .C; CALL AddElt;
+			END;
+			I = I+18;
+		END;
+		UNTIL .Z;
+
+		" Passage au secteur suivant";
+		.Y = 2;
+		NP = BUFFER2[.Y];	" .A = ZP_PTR[.Y]; NP = .A;";
+
+		INC .Y;
+		NS = BUFFER2[.Y];	" .A = ZP_PTR[.Y]; NS = .A;";
+
+		" NS=0 si dernier secteur du catalogue atteint";
+	END;
+	UNTIL .Z;
+
+	.Y = ArrayIndex_FI;		" Valeur de la variable (poids faible)";
+	.A = $00;
+	.X = $02;			" Index de la variable 'FI'";
+	CALL SetCH376Var;
+
+	" On indique le dernier secteur lu";
+	.Y = 1;
+	NS = BUFFER2[.Y];
+	DEC .Y;
+	NP = BUFFER2[.Y];
+
+	" Indique que tout s'est bien passé";
+	.A = #INT_SUCCESS;
+
+CAT_End:
+
+RETURN;
+
+"---------------------------------------------------------------------------";
+"                 Lecture du catalogue d'une image Sedoric                  ";
+"---------------------------------------------------------------------------";
+DIR:
+	" 1er secteur du catalogue";
+	NP = 20;
+	NS =  4;
+	BUFFER_PTR =## BUFFER2;
+
+	REPEAT;
+	DO;
+		CALL _ReadSector;	" Dure environ 62000 cycles";
+		IFF .A ^= #INT_SUCCESS THEN DIR_End;
+
+		" Traitement du secteur du catalogue";
+		I = 16;
+		REPEAT;
+		DO;
+			CLEAR .C;
+			.A+13;
+			.Y = .A;
+			IF BUFFER2[.Y] ^= $00 THEN
+			DO;
+				" Adresse du nom de fichier dans AY";
+				.A = I;
+				.Y = #>BUFFER2;
+
+				" Affiche l'entrée du catalogue";
+				".X = 12;";
+				"CALL PrintAY;";
+
+				".A = 13; CALL PrintA;";
+				".A = 10; CALL PrintA;";
+
+				" Met à jour le tableau";
+				.X = $00;
+				'INC ArrayIndex,X';
+
+				CLEAR .C; CALL AddElt;
+			END;
+			I = I+16;
+		END;
+		UNTIL .Z;
+
+		" Passage au secteur suivant";
+		.Y = 0;
+		NP = BUFFER2[.Y];	" .A = ZP_PTR[.Y]; NP = .A;";
+
+		INC .Y;
+		NS = BUFFER2[.Y];	" .A = ZP_PTR[.Y]; NS = .A;";
+
+		" NS=0 si dernier secteur du catalogue atteint";
+	END;
+	UNTIL .Z;
+
+	.Y = ArrayIndex_FI;		" Valeur de la variable (poids faible)";
+	.A = $00;
+	.X = $02;			" Index de la variable 'FI'";
+	CALL SetCH376Var;
+
+	" On indique le dernier secteur lu";
+	.Y = 1;
+	NS = BUFFER2[.Y];
+	DEC .Y;
+	NP = BUFFER2[.Y];
+
+	" Indique que tout s'est bien passé";
+	.A = #INT_SUCCESS;
+
+DIR_End:
+
+RETURN;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+"Error:";
+"	.Y = .A;";
+"	CLEAR .A;";
+"RETURN;";
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+SetDiskname:
+		" TODO: Faire une fonction SetFilename2 qui saute les ' '";
+		" Longeur de la chaine";
+		IF .X >=12 THEN .X = 12;
+
+		PTR_READ_DEST <- .AY;
+
+		CH376_COMMAND = $2F;
+		CLEAR .Y;
+		REPEAT;
+		DO;
+			.A = @PTR_READ_DEST[.Y];
+			CH376_DATA = .A;
+			INC .Y;
+			DEC .X;
+		END;
+		UNTIL .Z;
+		CH376_DATA = $00;
+RETURN;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"                            ReadSectotr                                    ";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+" Entree:                                                                   ";
+"        Le fichier .dsk doit avoir été ouvert                              ";
+"        NP: N° de la piste                                                 ";
+"        NS: N° du secteur                                                  ";
+"BUFFER_PTR: Adresse du buffer pour le secteur à lire                       ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"        AY: Code erreur CH376  ($14 si Ok)                                 ";
+"---------------------------------------------------------------------------";
+_ReadSector:
+	.A = NP;
+	CALL TrackOffset;
+	CALL ByteLocate;
+	"IFF ^.Z THEN RS_End;"		" Trop loin sans les optimisations";
+	IF ^.Z THEN GOTO RS_End;
+
+	.A = #<TrackSize;
+	.Y = #>TrackSize;
+	CALL SetByteRead;
+	IFF ^.Z THEN RS_End;
+
+	.A = #<BUFFER;
+	.Y = #>BUFFER;
+
+	CALL ReadUSBData;
+	"IFF .Y = 0 THEN Error;";
+
+	ZP_PTR <- BUFFER_PTR;
+
+	CLEAR .V;
+
+	REPEAT;
+	BEGIN;
+		" GAP1 / GAP4 / GAP2 / GAP5";
+		"Remplacer BEQ *+5 / JMP ZZxxxx par BNE ZZxxxx";
+		REPEAT;
+		BEGIN;
+			CALL GetByte;
+			" Si fin du fichier, on force la sortie";
+			IF .O THEN .A = $FE;
+		END;
+		UNTIL .A = $FE;
+
+		IF ^.O THEN
+		DO;
+			" ID Field";
+			CALL GetByte; Track  = .A;
+			CALL GetByte; Head   = .A;
+			CALL GetByte; Sector = .A;
+			CALL GetByte; Size   = .A;
+			CALL GetByte; CRC_L  = .A;
+			CALL GetByte; CRC_H  = .A;
+
+			" GAP 3";
+			"Remplacer BEQ *+5 / JMP ZZxxxx par BNE ZZxxxx";
+			REPEAT; CALL GetByte; UNTIL .A = $FB;
+
+			" Data (lecture de 256 octets)";
+			" Ne tient pas compte de Size";
+			" A voir pour sauter plus rapidement les 256 octets";
+			" du secteur si ce n'est pas le bon";
+			.Y = 0;
+			REPEAT;
+			BEGIN;
+				CALL GetByte;
+				'STA (ZP_PTR),Y';
+				INC .Y;
+			END;
+			UNTIL .Z;
+
+			" Data CRC";
+			CALL GetByte; CRC_L = .A;
+			CALL GetByte; CRC_H = .A;
+
+			" Secteur trouvé, on sort";
+			"Remplacer BEQ *+5 / JMP ZZxxxx par BNE ZZxxxx";
+			IF Sector = NS THEN CALL SEV;
+		END;
+	END;
+	UNTIL .O;
+
+	" On arrive ici avec .A = $FE ou Sector = NS (et .A = Sector)";
+
+	"CALL FileClose;";
+
+	" Si le secteur n'a pas ete trouve, on indique une erreur";
+	" Sinon le code de retour est celui de FileClose soit $14";
+	" normalement (a modifier eventuellement au cas ou le";
+	"  FileClose se passe mal?)";
+
+	.Y = #INT_SUCCESS;
+	IF Sector ^= NS THEN .Y = $FF;
+
+	.A = .Y;
+RS_End:
+
+RETURN;
+
+"---------------------------------------------------------------------------";
+"                                                                           ";
+"---------------------------------------------------------------------------";
+SEV:
+	'BIT *-1';
+RETURN;
+
+"---------------------------------------------------------------------------";
+" TrackOffset:                                                              ";
+"	Calcule l'offset d'une piste = Piste * 25 + 256                     ";
+"	(6400 = 25 * 256)                                                   ";
+"                                                                           ";
+" Entree:                                                                   ";
+" 	ACC: N° de piste                                                    ";
+"                                                                           ";
+" Sortie:                                                                   ";
+"	ACC: Poids faible du résultat -1                                    ";
+"	OFFSET: Résultat sur 16 bits                                        ";
+"                                                                           ";
+" Utilise:                                                                  ";
+"	OFFSET: 16 bits, résultat                                           ";
+"                                                                           ";
+" La valeur sur 32 bits: 0 total_h total_l 0                                ";
+" Pas de débordement sur le 4ième octet tant que                            ";
+"     le n° de piste < 2622 (=65535/25)                                     ";
+"                                                                           ";
+" En principe tous les CLC sont inutiles                                    ";
+"                                                                           ";
+" Voir routine optimisée plus bas                                           ";
+"---------------------------------------------------------------------------";
+TrackOffset:
+	" STACK A;";		" Si on ne veut pas utiliser .Y ";
+
+	"Initialise OFFSET[]";
+	.Y = 0;			" Remplacer .Y par .A si on veut conserver .Y ";
+	OFFSET_0 = .Y;
+	OFFSET_L = .A;
+	OFFSET_H = .Y;
+	OFFSET_3 = .Y;
+
+	" x2";
+	SHIFT  LEFT OFFSET_L;
+	ROTATE LEFT OFFSET_H;
+
+	" +1 -> x3";
+	STACK .A;
+	CLEAR .C;
+	.A + OFFSET_L; OFFSET_L = .A;
+	IF .C THEN INC OFFSET_H;
+
+	" x8 -> x24";
+	SHIFT  LEFT OFFSET_L;
+	ROTATE LEFT OFFSET_H;
+	SHIFT  LEFT OFFSET_L;
+	ROTATE LEFT OFFSET_H;
+	SHIFT  LEFT OFFSET_L;
+	ROTATE LEFT OFFSET_H;
+
+	" +1 -> x25";
+	UNSTACK .A;
+	CLEAR .C;
+	.A + OFFSET_L; OFFSET_L = .A;
+	IF .C THEN INC OFFSET_H;
+
+	" +256";
+	INCW OFFSET_L;
+
+	".A = OFFSET_L";
+	".Y = OFFSET_H";
+RETURN;
+
+"---------------------------------------------------------------------------";
+"                          Fin du programme                                 ";
+"---------------------------------------------------------------------------";
+
+
+'#include "lib/CH376.s"';
+
+EXIT;
+
