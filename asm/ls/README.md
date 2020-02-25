@@ -1,4 +1,4 @@
-## Commande DIR.
+## Commande LS.
 
 ### Chargement du programme
 ```

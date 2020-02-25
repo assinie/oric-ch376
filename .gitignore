@@ -2,3 +2,5 @@
 *~
 /tmp/
 /work/
+*.lbl
+*.sym

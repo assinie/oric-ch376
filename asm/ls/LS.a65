@@ -133,8 +133,8 @@
 	AUTOEXEC= 0
 										;' .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC'; 
 	 .db $16, $16, $16, $16, $24, $ff, $ff, $80, AUTOEXEC
-										;' .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-DIR", $00'; 
-	 .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-DIR", $00
+										;' .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-LS", $00'; 
+	 .db >END, <END, >($9600-2), <($9600-2), $0B, "CH376-LS", $00
 ;---------------------------------------------------------------------------
 ; 
 ; Variables et buffers 
@@ -142,8 +142,8 @@
 ;---------------------------------------------------------------------------
 										;DEFINE * = $9600-2; 
 	*=$9600-2
-										;DATAW Dir; 
-	.WORD Dir 
+										;DATAW LS;
+	.WORD LS
 										;DECLARE DIRNAME CHARACTER['/']; 
 	DIRNAME .BYT '/'
 										;DATA 0,0,0,0,0,0,0,0,0,0,0; 
@@ -174,8 +174,8 @@
 ; Debut du programme 
 ; 
 ;---------------------------------------------------------------------------
-										;Dir: 
-	Dir 
+										;LS:
+	LS
 										; CALL GetParams; 
 	JSR GetParams 
 										; IF ^.Z THEN GOTO SyntaxError; 
@@ -456,7 +456,7 @@ ZZ0011
 										; END; 
 										; UNTIL .Z; 
 	BNE ZZ0011 
-										; .A = @VAR_ADDR[.Y]; " Taille de la chaine";
+										; .A = @VAR_ADDR[.Y]; " Taille de la chaine"; 
 	LDA (VAR_ADDR),Y
 										; IFF .Z THEN Vide; 
 	BEQ Vide 
